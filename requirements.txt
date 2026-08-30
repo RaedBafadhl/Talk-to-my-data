@@ -1,0 +1,21 @@
+# Data & Cloud (Pillar 1)
+google-cloud-bigquery
+pandas
+pyarrow
+
+# Backend (Pillar 3)
+fastapi
+uvicorn
+pydantic
+
+# Frontend (Pillar 4)
+streamlit
+plotly
+
+# Shared / utility
+python-dotenv
+requests
+
+# Add your LLM SDK here once decided (Pillar 2), e.g.:
+# anthropic
+# google-cloud-aiplatform
