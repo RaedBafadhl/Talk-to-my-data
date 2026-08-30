@@ -1,11 +1,6 @@
 # Talk-to-my-Data (GenAI BI) — The Gadget Store
 **Artefact Capstone 2026 | Case #1: Building a real-world Generative AI application**
-
-**Team:** Raed Ali Ba Fadhl (Lead), Fares Al-humaikani, Amir Safi, Muhammed Dulger
-**Client contacts:** mark.rademaker@artefact.com · quinten.tulp@artefact.com
-
 ---
-
 ## 1. What we're building
 
 A natural-language business intelligence assistant for The Gadget Store's sales team. A non-technical user asks a question in plain English (e.g. *"What were total headphone sales in the Netherlands over the last 3 months?"*), and the system:
