@@ -74,12 +74,12 @@ One row per currency per date — used to convert all sales into a common curren
 
 ---
 
-## Relationshipssales.
+## Relationships
 
-product_key → products.product_key
-sales.customer_key → customers.customer_key
-sales.store_key → stores.store_key
-sales.currency_code + sales.order_date → exchange_rates.currency + exchange_rates.date
+- `sales.product_key` → `products.product_key`
+- `sales.customer_key` → `customers.customer_key`
+- `sales.store_key` → `stores.store_key`
+- `sales.currency_code` + `sales.order_date` → `exchange_rates.currency` + `exchange_rates.date`
 
 ---
 
@@ -97,4 +97,3 @@ The LLM should use this table when it sees these words in a user's question:
 | "by country" / "by region" | `GROUP BY customers.country` or `stores.country` — confirm which one the user means |
 
 **Note:** if a question is genuinely ambiguous, the assistant should ask a clarification question rather than guess — see `api.md`.
-
