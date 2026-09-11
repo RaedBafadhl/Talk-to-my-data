@@ -32,3 +32,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Credentials & Secrets
+.env
+*.json
+!package.json
+!tsconfig.json
