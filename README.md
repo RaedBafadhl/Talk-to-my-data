@@ -131,3 +131,11 @@ We work through the project in gated stages. Early stages are short and everyone
 ---
 
 
+## Development Environment Setup
+
+1. **Python Version:** Make sure you have **Python 3.12+** installed.
+2. **Virtual Environment Setup:**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+   pip install -r requirements.txt

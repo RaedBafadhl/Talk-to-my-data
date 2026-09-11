@@ -2,11 +2,13 @@
 google-cloud-bigquery
 pandas
 pyarrow
+db-dtypes
 
 # Backend (Pillar 3)
 fastapi
 uvicorn
 pydantic
+sqlparse
 
 # Frontend (Pillar 4)
 streamlit
