@@ -2,7 +2,6 @@
 **Artefact Capstone 2026 | Case #1: Building a real-world Generative AI application**
 
 **Team:** Raed Ali Ba Fadhl (Lead), Fares Al-humaikani, Amir Safi, Muhammed Dulger
-**Client contacts:** mark.rademaker@artefact.com · quinten.tulp@artefact.com
 
 ---
 
