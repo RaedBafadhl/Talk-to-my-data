@@ -53,13 +53,13 @@ One row per customer.
 ## Table: `stores`
 One row per physical store.
 
+**Updated after real data check (Pillar 1.1):** the real dataset does not include `city` or `store_name` — removed from this schema so the AI and team never reference columns that don't actually exist. Stores can only be identified by `store_key`, `country`, and `state`.
+
 | Column | Type | Notes |
 |---|---|---|
 | store_key | INTEGER | Primary key |
 | country | STRING | |
 | state | STRING | |
-| city | STRING | |
-| store_name | STRING | |
 | square_meters | INTEGER | Store size |
 | open_date | DATE | |
 
@@ -76,10 +76,12 @@ One row per currency per date — used to convert all sales into a common curren
 
 ## Relationships
 
-- `sales.product_key` → `products.product_key`
-- `sales.customer_key` → `customers.customer_key`
-- `sales.store_key` → `stores.store_key`
-- `sales.currency_code` + `sales.order_date` → `exchange_rates.currency` + `exchange_rates.date`
+```
+sales.product_key   → products.product_key
+sales.customer_key  → customers.customer_key
+sales.store_key     → stores.store_key
+sales.currency_code + sales.order_date → exchange_rates.currency + exchange_rates.date
+```
 
 ---
 
@@ -94,6 +96,6 @@ The LLM should use this table when it sees these words in a user's question:
 | "profit" | `SUM(sales.quantity * (products.unit_price - products.unit_cost) * exchange_rates.exchange_rate)` |
 | "average order value" / "AOV" | total revenue ÷ `COUNT(DISTINCT sales.order_number)` |
 | "top product" | highest `SUM(quantity)` or `SUM(revenue)`, grouped by `product_name` |
-| "by country" / "by region" | `GROUP BY customers.country` or `stores.country` — confirm which one the user means |
+| "by country" / "by region" | `GROUP BY customers.country` or `stores.country` — confirm which one the user means (customer location vs. store location can differ) |
 
-**Note:** if a question is genuinely ambiguous, the assistant should ask a clarification question rather than guess — see `api.md`.
+**Note:** if a question is genuinely ambiguous (e.g. "sales" could mean revenue or units), the assistant should ask a clarification question rather than guess — see `api.md`.
