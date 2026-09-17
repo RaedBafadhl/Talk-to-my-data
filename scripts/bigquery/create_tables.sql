@@ -18,7 +18,7 @@
 -- One row per line item within an order.
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS `290271728971.retail_dw.sales`
+CREATE TABLE IF NOT EXISTS `572029936014.retail_dw.sales`
 (
     order_date DATE,
     order_number STRING,
@@ -39,7 +39,7 @@ CLUSTER BY product_key, customer_key, store_key;
 -- One row per product.
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS `290271728971.retail_dw.products`
+CREATE TABLE IF NOT EXISTS `572029936014.retail_dw.products`
 (
     product_key INT64,
     product_name STRING,
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS `290271728971.retail_dw.products`
 -- One row per customer.
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS `290271728971.retail_dw.customers`
+CREATE TABLE IF NOT EXISTS `572029936014.retail_dw.customers`
 (
     customer_key INT64,
     name STRING,
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS `290271728971.retail_dw.customers`
 -- This follows contracts/schema.md exactly.
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS `290271728971.retail_dw.stores`
+CREATE TABLE IF NOT EXISTS `572029936014.retail_dw.stores`
 (
     store_key INT64,
     country STRING,
@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS `290271728971.retail_dw.stores`
 -- Used to convert sales into a common currency.
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS `290271728971.retail_dw.exchange_rates`
+CREATE TABLE IF NOT EXISTS `572029936014.retail_dw.exchange_rates`
 (
     date DATE,
     currency STRING,
