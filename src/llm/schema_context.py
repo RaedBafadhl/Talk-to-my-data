@@ -108,6 +108,15 @@ def select_relevant_tables(question: str) -> set:
         selected.add("customers")
         selected.add("stores")
 
+    # Safety fallback: if no keyword category matched anything (selected is
+    # still just the default "sales"), the question may be phrased in a way
+    # our keyword list doesn't cover. Rather than risk missing a table the
+    # AI actually needs, fall back to including everything -- our whole
+    # schema is small (5 tables, ~5k characters), so this costs almost
+    # nothing and trades a tiny bit of efficiency for real reliability.
+    if selected == {"sales"}:
+        return set(TABLE_NAMES)
+
     return selected
 
 
