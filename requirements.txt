@@ -9,7 +9,7 @@ fastapi
 uvicorn
 pydantic
 sqlparse
-
+google-genai
 # Frontend (Pillar 4)
 streamlit
 plotly
@@ -21,3 +21,4 @@ requests
 # Add your LLM SDK here once decided (Pillar 2), e.g.:
 # anthropic
 # google-cloud-aiplatform
+google-genai
