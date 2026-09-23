@@ -25,7 +25,7 @@ from google.genai import types
 from google.cloud import bigquery
 
 sys.path.append(os.path.dirname(__file__))
-from prompt_builder import build_system_prompt
+from schema_context import build_system_prompt
 from generate_sql import generate_sql
 
 load_dotenv()
@@ -72,7 +72,7 @@ def build_correction_prompt(question: str, failed_sql: str, error_message: str) 
     Extends the schema-aware system prompt with the exact failure details,
     instructing Gemini to fix the error based on database schema.
     """
-    base_prompt = build_system_prompt()
+    base_prompt = build_system_prompt(question)
 
     correction_instructions = f"""
 
@@ -140,12 +140,33 @@ def execute_with_self_healing(
         try:
             current_sql = clean_sql_output(generate_sql(question))
         except Exception as gen_err:
-            print(f"[Self-Healing Warning] Initial LLM generation unavailable ({gen_err}). Using fallback query structure.")
+            print(
+                f"[Self-Healing Warning] Initial LLM generation unavailable ({gen_err}). Using fallback query structure."
+            )
             current_sql = f"SELECT SUM(quantity) as units_sold FROM `tgs-talk-to-data.retail_dw.sales` WHERE year = 2025"
     else:
         current_sql = clean_sql_output(initial_sql)
 
     history: List[Dict[str, Any]] = []
+
+    # If the generated response is actually a clarification request (not SQL
+    # at all), stop immediately -- don't waste retries treating a genuine
+    # ambiguous question as a broken query.
+    if current_sql.strip().startswith("CLARIFY:"):
+        clarification_question = current_sql.strip()[len("CLARIFY:") :].strip()
+        print(
+            f"[Self-Healing] Question needs clarification, not a SQL error -- stopping retry loop."
+        )
+        return {
+            "status": "needs_clarification",
+            "question": question,
+            "final_sql": None,
+            "attempts": 0,
+            "history": history,
+            "data": [],
+            "error": None,
+            "clarification_question": clarification_question,
+        }
 
     # 2. Determine execution callback
     if executor_fn is None:
@@ -166,10 +187,14 @@ def execute_with_self_healing(
 
     # 4. Self-Healing execution loop
     for attempt in range(1, max_retries + 1):
-        print(f"\n[Self-Healing] Attempt {attempt}/{max_retries} executing SQL:\n{current_sql}\n")
+        print(
+            f"\n[Self-Healing] Attempt {attempt}/{max_retries} executing SQL:\n{current_sql}\n"
+        )
         try:
             data = run_query(current_sql)
-            print(f"[Self-Healing SUCCESS] Query succeeded on attempt {attempt}! Returned {len(data)} rows.")
+            print(
+                f"[Self-Healing SUCCESS] Query succeeded on attempt {attempt}! Returned {len(data)} rows."
+            )
             return {
                 "status": "success",
                 "question": question,
@@ -182,28 +207,42 @@ def execute_with_self_healing(
 
         except Exception as e:
             error_msg = str(e)
-            print(f"[Self-Healing INTERCEPT] Attempt {attempt} failed with BigQuery error:\n{error_msg}\n")
+            print(
+                f"[Self-Healing INTERCEPT] Attempt {attempt} failed with BigQuery error:\n{error_msg}\n"
+            )
 
-            history.append({
-                "attempt": attempt,
-                "failed_sql": current_sql,
-                "error": error_msg,
-            })
+            history.append(
+                {
+                    "attempt": attempt,
+                    "failed_sql": current_sql,
+                    "error": error_msg,
+                }
+            )
 
             if attempt < max_retries:
-                print(f"[Self-Healing LOOP] Feeding error back to LLM (Gemini) for self-correction...")
+                print(
+                    f"[Self-Healing LOOP] Feeding error back to LLM (Gemini) for self-correction..."
+                )
                 try:
                     current_sql = fix_sql(question, current_sql, error_msg)
-                    print(f"[Self-Healing HEALED] LLM generated corrected SQL for attempt {attempt + 1}.")
+                    print(
+                        f"[Self-Healing HEALED] LLM generated corrected SQL for attempt {attempt + 1}."
+                    )
                 except Exception as corr_err:
                     print(f"[Self-Healing LLM Warning] LLM API call error: {corr_err}")
                     # Local fallback rule for offline test resilience
                     if "headphone_sales_total" in current_sql:
-                        current_sql = current_sql.replace("headphone_sales_total", "quantity")
+                        current_sql = current_sql.replace(
+                            "headphone_sales_total", "quantity"
+                        )
                     elif "year = 2025" in current_sql:
-                        current_sql = current_sql.replace("year = 2025", "EXTRACT(YEAR FROM order_date) = 2025")
+                        current_sql = current_sql.replace(
+                            "year = 2025", "EXTRACT(YEAR FROM order_date) = 2025"
+                        )
             else:
-                print(f"[Self-Healing FAILED] Max retries ({max_retries}) reached without resolving error.")
+                print(
+                    f"[Self-Healing FAILED] Max retries ({max_retries}) reached without resolving error."
+                )
                 return {
                     "status": "error",
                     "question": question,
@@ -234,9 +273,13 @@ def run_simulated_self_healing_demo():
     def mock_bigquery_executor(sql: str) -> List[Dict[str, Any]]:
         """Simulates BigQuery error response and eventual query success."""
         if "headphone_sales_total" in sql:
-            raise Exception("400 Unrecognized name: headphone_sales_total at [1:12]. Did you mean 'quantity'?")
+            raise Exception(
+                "400 Unrecognized name: headphone_sales_total at [1:12]. Did you mean 'quantity'?"
+            )
         if "WHERE year =" in sql:
-            raise Exception("400 Column 'year' not found in table sales. Use EXTRACT(YEAR FROM order_date).")
+            raise Exception(
+                "400 Column 'year' not found in table sales. Use EXTRACT(YEAR FROM order_date)."
+            )
 
         return [{"total_sales": 14200, "currency": "USD"}]
 
@@ -245,7 +288,9 @@ def run_simulated_self_healing_demo():
         if "headphone_sales_total" in err:
             return failed_sql.replace("headphone_sales_total", "quantity")
         if "year" in err:
-            return failed_sql.replace("WHERE year = 2025", "WHERE EXTRACT(YEAR FROM order_date) = 2025")
+            return failed_sql.replace(
+                "WHERE year = 2025", "WHERE EXTRACT(YEAR FROM order_date) = 2025"
+            )
         return failed_sql
 
     result = execute_with_self_healing(
@@ -265,7 +310,7 @@ def run_simulated_self_healing_demo():
     print(f"Retrieved Data:   {result['data']}")
     print("-" * 70)
     print("Audit History of Intercepted Errors:")
-    for item in result['history']:
+    for item in result["history"]:
         print(f"  Attempt {item['attempt']}:")
         print(f"    Failed SQL: {item['failed_sql']}")
         print(f"    Error Log:  {item['error']}")
@@ -277,7 +322,9 @@ if __name__ == "__main__":
         run_simulated_self_healing_demo()
     else:
         if len(sys.argv) < 2:
-            print("No command arguments passed. Running self-healing demonstration mode...\n")
+            print(
+                "No command arguments passed. Running self-healing demonstration mode...\n"
+            )
             run_simulated_self_healing_demo()
         else:
             test_question = sys.argv[1]
