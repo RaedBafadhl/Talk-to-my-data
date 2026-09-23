@@ -18,7 +18,7 @@ from google import genai
 from google.genai import types
 
 sys.path.append(os.path.dirname(__file__))
-from prompt_builder import build_system_prompt
+from schema_context import build_system_prompt
 
 load_dotenv()
 
@@ -60,7 +60,7 @@ def ask(question: str) -> dict:
     {"needs_clarification": bool, "clarification_question": str|None, "sql": str|None}
     """
     client = genai.Client(vertexai=True, project=PROJECT_ID, location=REGION)
-    system_prompt = build_clarification_prompt()
+    system_prompt = build_system_prompt(question)
 
     response = client.models.generate_content(
         model=MODEL_NAME,
