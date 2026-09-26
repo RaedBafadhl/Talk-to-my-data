@@ -55,6 +55,8 @@ One row per physical store.
 
 **Updated after real data check (Pillar 1.1):** the real dataset does not include `city` or `store_name` — removed from this schema so the AI and team never reference columns that don't actually exist. Stores can only be identified by `store_key`, `country`, and `state`.
 
+**Online sales:** `store_key = 0` (with `country = 'Online'`, `state = 'Online'`) represents all online orders, not a physical location. Added during Pillar 1.1 cleaning since online orders in the raw data had no matching physical store.
+
 | Column | Type | Notes |
 |---|---|---|
 | store_key | INTEGER | Primary key |
@@ -97,5 +99,6 @@ The LLM should use this table when it sees these words in a user's question:
 | "average order value" / "AOV" | total revenue ÷ `COUNT(DISTINCT sales.order_number)` |
 | "top product" | highest `SUM(quantity)` or `SUM(revenue)`, grouped by `product_name` |
 | "by country" / "by region" | `GROUP BY customers.country` or `stores.country` — confirm which one the user means (customer location vs. store location can differ) |
+| "online sales" / "online orders" | `WHERE stores.store_key = 0` (or `stores.country = 'Online'`) — this is the only "store" that isn't a physical location |
 
 **Note:** if a question is genuinely ambiguous (e.g. "sales" could mean revenue or units), the assistant should ask a clarification question rather than guess — see `api.md`.

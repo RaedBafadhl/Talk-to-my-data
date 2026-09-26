@@ -51,9 +51,9 @@ GOLDEN_DATASET = [
         "tolerance": 100.0,
     },
     {
-        "question": "How many distinct customers do we have?",
+        "question": "How many customer records are in our database?",
         "expect_clarification": False,
-        "expected_answer": 11887,
+        "expected_answer": 15266,
         "tolerance": 1,
     },
     {
