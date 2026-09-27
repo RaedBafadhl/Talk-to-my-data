@@ -1,7 +1,7 @@
 """
 Pillar 2.1 -- Dynamic Schema Injection (end-to-end test)
 
-Uses the schema-aware system prompt from prompt_builder.py to actually call
+Uses the schema-aware system prompt from schema_context.py to actually call
 Google's Gemini model (via the Agent Platform / Vertex AI backend) and
 generate SQL from a plain-English question.
 
