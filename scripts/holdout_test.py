@@ -11,6 +11,15 @@ more few-shot examples), not a patch aimed at one specific phrasing.
 Run this occasionally (e.g. once a week, or before a big milestone) to
 sanity-check that the system isn't just memorizing the golden set.
 
+ROTATION LOG:
+- Round 1 (initial): 8 questions, all new. Found and fixed a real bug
+  (unaliased columns breaking on the hyphenated project ID).
+- Round 2 (this version): kept 3 questions that were never the direct
+  cause of a fix (still "clean"), retired 5 that were heavily analyzed
+  during Round 1, added 5 genuinely new ones covering different metrics,
+  dimensions, and one deliberate edge case (customer age -- not covered
+  in schema.md's business terms yet, worth seeing how it's handled).
+
 Usage:
     python scripts/holdout_test.py
 """
@@ -21,22 +30,22 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src", "llm"))
 from self_healing import execute_with_self_healing
 
-# These questions are DELIBERATELY different in phrasing and combination
-# from anything in golden_dataset.py or baseline_test.py.
 HOLDOUT_QUESTIONS = [
+    # Kept from Round 1 -- never directly drove a fix, still reasonably "clean"
     "What is our average order value?",
-    "How many customers do we have in Germany?",
-    "Which brand sells the most?",
-    "How many orders came from online sales?",
     "What percentage of our customers are male?",
-    "What's the profit margin on computers?",
-    "Show me units sold by store.",
     "Which product category has the highest average price?",
+    # New for Round 2
+    "What's our busiest sales month, historically?",
+    "How many products do we carry in the Cell Phones category?",
+    "What's the price difference between our cheapest and most expensive product?",
+    "Which continent generates the most revenue?",
+    "What's the average age of our customers?",  # deliberate edge case -- "age" isn't a stored column, only birthday
 ]
 
 if __name__ == "__main__":
     print("=" * 70)
-    print("HOLDOUT TEST -- genuinely new questions, not used to tune the system")
+    print("HOLDOUT TEST -- Round 2 (rotated set)")
     print("=" * 70)
     print("Reminder: do NOT fix specific failures here by tweaking prompts.")
     print("Use results to spot general patterns worth improving instead.\n")
