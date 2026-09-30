@@ -188,6 +188,12 @@ Question: What's the average age of our customers?
 SQL:
 SELECT AVG(DATE_DIFF(CURRENT_DATE(), t1.birthday, YEAR))
 FROM `tgs-talk-to-data.retail_dw.customers` AS t1
+ 
+Question: How many stores were opened after 2015?
+SQL:
+SELECT COUNT(t1.store_key)
+FROM `tgs-talk-to-data.retail_dw.stores` AS t1
+WHERE EXTRACT(YEAR FROM t1.open_date) > 2015
 """
 
     return f"""You are a SQL assistant for The Gadget Store (TGS), a retail company.

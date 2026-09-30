@@ -92,5 +92,6 @@ Business term	SQL meaning
 "repeat customer" / "loyal customer"	a customer_key with more than 1 distinct order_number
 "best-seller"	highest SUM(quantity), not necessarily highest revenue — confirm which the user means
 "margin"	same as "profit," sometimes expressed as a percentage: profit ÷ revenue
+"delivered" / "undelivered" order	there is no status column -- delivery_date IS NOT NULL means delivered, delivery_date IS NULL means undelivered
 
 Note: if a question is genuinely ambiguous (e.g. "sales" could mean revenue or units), the assistant should ask a clarification question rather than guess — see api.md.

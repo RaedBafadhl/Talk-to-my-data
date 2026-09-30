@@ -10,6 +10,9 @@ Key Features:
 2. Iterative Retry Loop: Automatically attempts re-execution up to `max_retries`.
 3. Audit History: Tracks each attempt, failed SQL, and error log for full observability.
 4. Non-Destructive: Exists as a standalone module so existing LLM scripts are unchanged.
+5. Clarification-aware: checks EVERY attempt (not just the first) for a CLARIFY
+   response -- a corrected attempt from the retry loop can also legitimately be
+   a clarification request, not just broken SQL.
 
 Usage:
     python src/llm/self_healing.py --demo
@@ -34,29 +37,22 @@ PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 REGION = os.getenv("GCP_REGION", "europe-west4")
 MODEL_NAME = "gemini-2.5-flash"
 
+CLARIFY_MARKER = "CLARIFY:"
+
 
 def get_genai_client() -> genai.Client:
-    """
-    Returns a configured Google GenAI client instance.
-    Prioritizes GEMINI_API_KEY if provided, otherwise defaults to Vertex AI configuration.
-    """
     api_key = os.getenv("GEMINI_API_KEY")
     if api_key:
         return genai.Client(api_key=api_key)
-
     if PROJECT_ID:
         try:
             return genai.Client(vertexai=True, project=PROJECT_ID, location=REGION)
         except Exception:
             pass
-
     return genai.Client()
 
 
 def clean_sql_output(sql_text: str) -> str:
-    """
-    Cleans raw LLM text output by removing markdown code fences or backticks.
-    """
     text = sql_text.strip()
     if text.startswith("```sql"):
         text = text[6:]
@@ -67,44 +63,49 @@ def clean_sql_output(sql_text: str) -> str:
     return text.strip()
 
 
+def check_clarification(sql_text: str) -> Optional[str]:
+    """
+    Returns the clarification question if the text is a CLARIFY response,
+    otherwise None. Used to check BOTH the initial generation and every
+    corrected attempt from the retry loop -- a correction can legitimately
+    turn out to be a clarification too, not just fixed SQL.
+    """
+    stripped = sql_text.strip()
+    if stripped.startswith(CLARIFY_MARKER):
+        return stripped[len(CLARIFY_MARKER) :].strip()
+    return None
+
+
 def build_correction_prompt(question: str, failed_sql: str, error_message: str) -> str:
-    """
-    Extends the schema-aware system prompt with the exact failure details,
-    instructing Gemini to fix the error based on database schema.
-    """
     base_prompt = build_system_prompt(question)
 
     correction_instructions = f"""
-
+ 
 CRITICAL FIX REQUIRED (Self-Healing Feedback Loop):
 A previously generated SQL query failed when executed against BigQuery.
 Your task is to analyze the error message, identify the syntax/schema issue, and produce a corrected SQL query.
-
+ 
 User Question: "{question}"
 Failed SQL Query:
 {failed_sql}
-
+ 
 BigQuery Error Message:
 {error_message}
-
+ 
 INSTRUCTIONS FOR CORRECTION:
 1. Carefully inspect the schema provided above for valid table and column names.
 2. Fix the error highlighted by BigQuery (e.g. invalid column name, wrong table reference, syntax error, grouping error, type mismatch).
 3. Ensure the corrected query strictly follows the rules (SELECT statements only, fully-qualified table names `tgs-talk-to-data.retail_dw.<table_name>`).
-4. Output ONLY the raw corrected SQL query with no explanation and no markdown formatting.
+4. If, after reviewing the schema, the column or concept genuinely does not exist anywhere in the given schema, do NOT guess another plausible-sounding name -- respond with the CLARIFY format instead, explaining what's missing.
+5. Output ONLY the raw corrected SQL query (or a CLARIFY response) with no explanation and no markdown formatting.
 """
     return base_prompt + correction_instructions
 
 
 def generate_corrected_sql(question: str, failed_sql: str, error_message: str) -> str:
-    """
-    Calls Gemini to generate a self-corrected SQL query based on the error context.
-    """
     client = get_genai_client()
     system_prompt = build_correction_prompt(question, failed_sql, error_message)
-
     prompt = f"Please fix the failed SQL query for question: '{question}'"
-
     response = client.models.generate_content(
         model=MODEL_NAME,
         contents=prompt,
@@ -121,21 +122,6 @@ def execute_with_self_healing(
     llm_corrector_fn: Optional[Callable[[str, str, str], str]] = None,
     max_retries: int = 3,
 ) -> Dict[str, Any]:
-    """
-    Executes a SQL query against BigQuery (or custom executor) with an automatic self-healing feedback loop.
-
-    Parameters:
-        question (str): The natural language user question.
-        initial_sql (str, optional): Pre-generated SQL query. If None, generate_sql() is called.
-        bq_client (bigquery.Client, optional): BigQuery client instance for real execution.
-        executor_fn (Callable, optional): Custom execution function for testing/mocking.
-        llm_corrector_fn (Callable, optional): Custom function for fixing SQL (used for offline testing).
-        max_retries (int): Maximum self-correction attempts (default: 3).
-
-    Returns:
-        Dict[str, Any]: Execution report containing status, final SQL, result data, attempt count, and attempt history.
-    """
-    # 1. Obtain initial SQL query
     if not initial_sql:
         try:
             current_sql = clean_sql_output(generate_sql(question))
@@ -143,17 +129,15 @@ def execute_with_self_healing(
             print(
                 f"[Self-Healing Warning] Initial LLM generation unavailable ({gen_err}). Using fallback query structure."
             )
-            current_sql = f"SELECT SUM(quantity) as units_sold FROM `tgs-talk-to-data.retail_dw.sales` WHERE year = 2025"
+            current_sql = f"SELECT SUM(quantity) as units_sold FROM `tgs-talk-to-data.retail_dw.sales` WHERE EXTRACT(YEAR FROM order_date) = 2025"
     else:
         current_sql = clean_sql_output(initial_sql)
 
     history: List[Dict[str, Any]] = []
 
-    # If the generated response is actually a clarification request (not SQL
-    # at all), stop immediately -- don't waste retries treating a genuine
-    # ambiguous question as a broken query.
-    if current_sql.strip().startswith("CLARIFY:"):
-        clarification_question = current_sql.strip()[len("CLARIFY:") :].strip()
+    # Check the INITIAL response for a clarification request
+    clarification = check_clarification(current_sql)
+    if clarification:
         print(
             f"[Self-Healing] Question needs clarification, not a SQL error -- stopping retry loop."
         )
@@ -165,10 +149,9 @@ def execute_with_self_healing(
             "history": history,
             "data": [],
             "error": None,
-            "clarification_question": clarification_question,
+            "clarification_question": clarification,
         }
 
-    # 2. Determine execution callback
     if executor_fn is None:
         if bq_client is None:
             bq_client = bigquery.Client(project=PROJECT_ID)
@@ -182,10 +165,8 @@ def execute_with_self_healing(
     else:
         run_query = executor_fn
 
-    # 3. Determine LLM correction callback
     fix_sql = llm_corrector_fn if llm_corrector_fn else generate_corrected_sql
 
-    # 4. Self-Healing execution loop
     for attempt in range(1, max_retries + 1):
         print(
             f"\n[Self-Healing] Attempt {attempt}/{max_retries} executing SQL:\n{current_sql}\n"
@@ -228,17 +209,27 @@ def execute_with_self_healing(
                     print(
                         f"[Self-Healing HEALED] LLM generated corrected SQL for attempt {attempt + 1}."
                     )
+
+                    # NEW: check if the CORRECTED attempt is itself a clarification
+                    # request -- it can legitimately be one, not just fixed SQL.
+                    clarification = check_clarification(current_sql)
+                    if clarification:
+                        print(
+                            f"[Self-Healing] Correction turned out to be a clarification request -- stopping retry loop."
+                        )
+                        return {
+                            "status": "needs_clarification",
+                            "question": question,
+                            "final_sql": None,
+                            "attempts": attempt,
+                            "history": history,
+                            "data": [],
+                            "error": None,
+                            "clarification_question": clarification,
+                        }
+
                 except Exception as corr_err:
                     print(f"[Self-Healing LLM Warning] LLM API call error: {corr_err}")
-                    # Local fallback rule for offline test resilience
-                    if "headphone_sales_total" in current_sql:
-                        current_sql = current_sql.replace(
-                            "headphone_sales_total", "quantity"
-                        )
-                    elif "year = 2025" in current_sql:
-                        current_sql = current_sql.replace(
-                            "year = 2025", "EXTRACT(YEAR FROM order_date) = 2025"
-                        )
             else:
                 print(
                     f"[Self-Healing FAILED] Max retries ({max_retries}) reached without resolving error."
@@ -255,23 +246,14 @@ def execute_with_self_healing(
 
 
 def run_simulated_self_healing_demo():
-    """
-    Demonstrates the full self-healing feedback loop with step-by-step console outputs.
-    Allows testing the logic locally without requiring active cloud billing.
-    """
     print("=" * 70)
     print("DEMO: SELF-HEALING QUERY FEEDBACK LOOP (PILLAR 2.3)")
     print("=" * 70)
 
     question = "What were total headphone sales in 2025?"
-
-    # Initial SQL contains 2 intentionally introduced errors:
-    # 1. Invalid column name: 'headphone_sales_total'
-    # 2. Invalid WHERE clause: 'year = 2025' (column is order_date)
     faulty_sql = "SELECT SUM(headphone_sales_total) as sales FROM `tgs-talk-to-data.retail_dw.sales` WHERE year = 2025"
 
     def mock_bigquery_executor(sql: str) -> List[Dict[str, Any]]:
-        """Simulates BigQuery error response and eventual query success."""
         if "headphone_sales_total" in sql:
             raise Exception(
                 "400 Unrecognized name: headphone_sales_total at [1:12]. Did you mean 'quantity'?"
@@ -280,11 +262,9 @@ def run_simulated_self_healing_demo():
             raise Exception(
                 "400 Column 'year' not found in table sales. Use EXTRACT(YEAR FROM order_date)."
             )
-
         return [{"total_sales": 14200, "currency": "USD"}]
 
     def mock_llm_corrector(q: str, failed_sql: str, err: str) -> str:
-        """Simulates Gemini analyzing the error and providing a fixed SQL query."""
         if "headphone_sales_total" in err:
             return failed_sql.replace("headphone_sales_total", "quantity")
         if "year" in err:

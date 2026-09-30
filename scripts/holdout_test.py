@@ -9,16 +9,22 @@ generalizes -- it should inform broader improvements (better instructions,
 more few-shot examples), not a patch aimed at one specific phrasing.
 
 Run this occasionally (e.g. once a week, or before a big milestone) to
-sanity-check that the system isn't just memorizing the golden set.
+sanity-check that the system isn't just memorizing previous rounds.
 
 ROTATION LOG:
-- Round 1 (initial): 8 questions, all new. Found and fixed a real bug
-  (unaliased columns breaking on the hyphenated project ID).
-- Round 2 (this version): kept 3 questions that were never the direct
-  cause of a fix (still "clean"), retired 5 that were heavily analyzed
-  during Round 1, added 5 genuinely new ones covering different metrics,
-  dimensions, and one deliberate edge case (customer age -- not covered
-  in schema.md's business terms yet, worth seeing how it's handled).
+- Round 1: 8 questions. Found and fixed a real bug (unaliased columns
+  breaking on the hyphenated project ID).
+- Round 2: 8 questions (3 kept from Round 1, 5 new). Used heavily to debug
+  and fix Pillar 2.2 (few-shot prompting) -- found and fixed: case-sensitive
+  string matching, missing order-aggregation example, missing age-calculation
+  example, and continent/stores confusion. Ended at 8/8 -- but by that point
+  had been run 4 times with fixes applied between runs, so it had effectively
+  become a second golden set, not a genuine holdout anymore. Retired.
+- Round 3 (this version): 8 completely new questions, touching fields and
+  patterns never tested in Round 1 or 2 (delivery dates, store open dates,
+  subcategories, city-level granularity, currency filtering, brand counts,
+  year-over-year comparison, store size). This is the first genuinely
+  untouched read on how well Pillar 2.2's fixes generalize.
 
 Usage:
     python scripts/holdout_test.py
@@ -31,21 +37,19 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src", "llm"))
 from self_healing import execute_with_self_healing
 
 HOLDOUT_QUESTIONS = [
-    # Kept from Round 1 -- never directly drove a fix, still reasonably "clean"
-    "What is our average order value?",
-    "What percentage of our customers are male?",
-    "Which product category has the highest average price?",
-    # New for Round 2
-    "What's our busiest sales month, historically?",
-    "How many products do we carry in the Cell Phones category?",
-    "What's the price difference between our cheapest and most expensive product?",
-    "Which continent generates the most revenue?",
-    "What's the average age of our customers?",  # deliberate edge case -- "age" isn't a stored column, only birthday
+    "How many stores were opened after 2015?",
+    "What's the total revenue from GBP transactions?",
+    "How many subcategories do we have under the Computers category?",
+    "Which store has the largest square footage?",
+    "How many customers live in London?",
+    "What percentage of orders have actually been delivered?",
+    "How many products does each brand carry?",
+    "What was the revenue growth from 2018 to 2019?",
 ]
 
 if __name__ == "__main__":
     print("=" * 70)
-    print("HOLDOUT TEST -- Round 2 (rotated set)")
+    print("HOLDOUT TEST -- Round 3 (genuinely fresh set)")
     print("=" * 70)
     print("Reminder: do NOT fix specific failures here by tweaking prompts.")
     print("Use results to spot general patterns worth improving instead.\n")
