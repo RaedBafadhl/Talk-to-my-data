@@ -37,8 +37,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+sys.path.append(
+    os.path.dirname(os.path.abspath(__file__))
+)  # this folder (src/backend) -- needed for response_formatter
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "llm"))
 from self_healing import execute_with_self_healing
+from response_formatter import format_response
 
 app = FastAPI(title="Talk-to-my-Data Backend")
 
@@ -129,20 +133,20 @@ def ask(request: AskRequest):
 
     elif status == "success":
         table = result.get("data", [])
-        summary = (
-            f"Query returned {len(table)} result(s)."
-            if table
-            else "No results found for this question."
+        formatted = format_response(
+            question=request.question,
+            sql=result.get("final_sql"),
+            rows=table,
         )
         logger.info(
             f"SUCCESS | question='{request.question}' | attempts={result.get('attempts')} | rows={len(table)}"
         )
         return AskResponse(
             status="ok",
-            sql=result.get("final_sql"),
-            summary=summary,
-            table=table,
-            chart=None,  # Pillar 3.4's job to generate this
+            sql=formatted["sql"],
+            summary=formatted["summary"],
+            table=formatted["table"],
+            chart=formatted["chart"],
         )
 
     else:  # status == "error"

@@ -156,15 +156,11 @@ EXAMPLES (these are real, verified question-to-SQL patterns -- follow this style
  
 Question: What was total revenue in December 2019?
 SQL:
-SELECT SUM(t1.quantity * t2.unit_price * t3.exchange_rate)
-FROM `tgs-talk-to-data.retail_dw.sales` AS t1
-JOIN `tgs-talk-to-data.retail_dw.products` AS t2 ON t1.product_key = t2.product_key
-JOIN `tgs-talk-to-data.retail_dw.exchange_rates` AS t3 ON t1.currency_code = t3.currency AND t1.order_date = t3.date
-WHERE t1.order_date BETWEEN '2019-12-01' AND '2019-12-31'
+SELECT SUM(t1.quantity * t2.unit_price * t3.exchange_rate) AS revenue
  
 Question: How many stores do we have?
 SQL:
-SELECT COUNT(t1.store_key)
+SELECT COUNT(t1.store_key) AS store_count
 FROM `tgs-talk-to-data.retail_dw.stores` AS t1
  
 Question: What are the top 5 product categories by revenue?
@@ -179,19 +175,19 @@ LIMIT 5
  
 Question: What is our average order value?
 SQL:
-SELECT SUM(t1.quantity * t2.unit_price * t3.exchange_rate) / COUNT(DISTINCT t1.order_number)
+SELECT SUM(t1.quantity * t2.unit_price * t3.exchange_rate) / COUNT(DISTINCT t1.order_number) AS average_order_value
 FROM `tgs-talk-to-data.retail_dw.sales` AS t1
 JOIN `tgs-talk-to-data.retail_dw.products` AS t2 ON t1.product_key = t2.product_key
 JOIN `tgs-talk-to-data.retail_dw.exchange_rates` AS t3 ON t1.currency_code = t3.currency AND t1.order_date = t3.date
  
 Question: What's the average age of our customers?
 SQL:
-SELECT AVG(DATE_DIFF(CURRENT_DATE(), t1.birthday, YEAR))
+SELECT AVG(DATE_DIFF(CURRENT_DATE(), t1.birthday, YEAR)) AS average_age
 FROM `tgs-talk-to-data.retail_dw.customers` AS t1
  
 Question: How many stores were opened after 2015?
 SQL:
-SELECT COUNT(t1.store_key)
+SELECT COUNT(t1.store_key) AS store_count
 FROM `tgs-talk-to-data.retail_dw.stores` AS t1
 WHERE EXTRACT(YEAR FROM t1.open_date) > 2015
 """
@@ -208,6 +204,7 @@ RULES (never break these):
 5. Return ONLY the SQL query, with no explanation, no markdown formatting -- UNLESS the question is ambiguous (see below).
 6. When filtering on a text/string column (e.g. category, country, brand), ALWAYS use a case-insensitive comparison: `LOWER(column) = LOWER('value')`. Never assume the exact capitalization the user typed matches the database -- a mismatch here causes a silently WRONG answer (e.g. zero results), not an error, which is worse than a crash.
 7. "Continent" ALWAYS means `customers.continent`. The `stores` table has NO continent column and NO geography/region lookup table exists anywhere in this database -- never invent one. If you cannot find a column the question needs, do NOT silently substitute a different, similar-sounding column (e.g. answering with country when asked for continent) -- that produces a misleadingly wrong answer. Instead, use the CLARIFY format to say you cannot answer as asked.
+8. ALWAYS give every calculated or aggregated column a meaningful name using `AS` (e.g. `SUM(...) AS revenue`, not just `SUM(...)`). Without this, BigQuery auto-names the column something meaningless like `f0_`, which produces a confusing summary for the end user.
 {few_shot_examples}
 AMBIGUITY CHECK (do this before writing any SQL):
 Common ambiguous cases in this project:

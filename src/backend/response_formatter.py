@@ -1,4 +1,5 @@
 from typing import Any
+from decimal import Decimal
 
 
 TIME_FIELDS = {
@@ -12,22 +13,45 @@ TIME_FIELDS = {
     "delivery_date",
 }
 
-NUMBER_TYPES = (int, float)
+# NOTE: Decimal added here -- BigQuery returns aggregated numeric results
+# (SUM, AVG, etc.) as Decimal, not plain int/float. Without this, every
+# chart and rich summary silently fails to detect the numeric column.
+NUMBER_TYPES = (int, float, Decimal)
+
+
+def _is_time_field(field_name: str) -> bool:
+    """
+    Checks if a time-related word appears anywhere in the field name, not
+    just an exact match. Real generated SQL often produces names like
+    'sales_year' or 'order_month' rather than the bare word -- an exact
+    match alone would miss these, and since extracted date parts (e.g.
+    EXTRACT(YEAR FROM ...)) are numeric, they'd otherwise never qualify as
+    a chart axis at all under the numeric/text fallback below.
+    """
+    name = field_name.lower()
+    return any(keyword in name for keyword in TIME_FIELDS)
 
 
 def _is_numeric(value: Any) -> bool:
     return isinstance(value, NUMBER_TYPES) and not isinstance(value, bool)
 
 
-def _find_numeric_field(rows: list[dict]) -> str | None:
+def _find_numeric_field(rows: list[dict], exclude: str | None = None) -> str | None:
     """
     Find the first column containing numeric values.
+
+    `exclude` skips a field already chosen for something else (e.g. the
+    x-axis) -- without this, a numeric dimension field like an extracted
+    year would get picked AGAIN as the y-axis value, plotting a field
+    against itself.
     """
 
     if not rows:
         return None
 
     for field in rows[0].keys():
+        if field == exclude:
+            continue
         for row in rows:
             value = row.get(field)
 
@@ -49,16 +73,12 @@ def _find_dimension_field(rows: list[dict]) -> str | None:
 
     # Prefer date/time fields
     for field in fields:
-        if field.lower() in TIME_FIELDS:
+        if _is_time_field(field):
             return field
 
     # Otherwise find a text/category field
     for field in fields:
-        values = [
-            row.get(field)
-            for row in rows
-            if row.get(field) is not None
-        ]
+        values = [row.get(field) for row in rows if row.get(field) is not None]
 
         if values and not all(_is_numeric(value) for value in values):
             return field
@@ -85,12 +105,12 @@ def build_chart_schema(rows: list[dict]) -> dict | None:
         return None
 
     x_field = _find_dimension_field(rows)
-    y_field = _find_numeric_field(rows)
+    y_field = _find_numeric_field(rows, exclude=x_field)
 
     if not x_field or not y_field:
         return None
 
-    if x_field.lower() in TIME_FIELDS:
+    if _is_time_field(x_field):
         chart_type = "line"
     else:
         chart_type = "bar"
@@ -118,22 +138,15 @@ def build_summary(
     if len(rows) == 1:
         row = rows[0]
 
-        values = ", ".join(
-            f"{key}: {value}"
-            for key, value in row.items()
-        )
+        values = ", ".join(f"{key}: {value}" for key, value in row.items())
 
         return f"The query returned one result: {values}."
 
-    numeric_field = _find_numeric_field(rows)
     dimension_field = _find_dimension_field(rows)
+    numeric_field = _find_numeric_field(rows, exclude=dimension_field)
 
     if numeric_field and dimension_field:
-        valid_rows = [
-            row
-            for row in rows
-            if _is_numeric(row.get(numeric_field))
-        ]
+        valid_rows = [row for row in rows if _is_numeric(row.get(numeric_field))]
 
         if valid_rows:
             highest = max(
