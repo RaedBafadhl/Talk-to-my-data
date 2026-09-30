@@ -140,10 +140,55 @@ def build_schema_context(question: str) -> str:
 
 def build_system_prompt(question: str) -> str:
     """
-    Full system prompt: instructions + only the relevant schema context,
-    plus ambiguity-checking instructions (Pillar 2.4 logic folded in).
+    Full system prompt: instructions + a few real worked examples (Pillar 2.2
+    few-shot prompting) + only the relevant schema context, plus ambiguity-
+    checking instructions (Pillar 2.4 logic folded in).
     """
     schema_context = build_schema_context(question)
+
+    # Pillar 2.2 -- Few-Shot Prompting
+    # These are REAL, VERIFIED examples -- each one has actually been run
+    # against BigQuery and confirmed correct (see scripts/golden_dataset.py
+    # history). Using real, proven examples rather than invented ones keeps
+    # the prompt honest and means every pattern shown is genuinely reliable.
+    few_shot_examples = """
+EXAMPLES (these are real, verified question-to-SQL patterns -- follow this style):
+ 
+Question: What was total revenue in December 2019?
+SQL:
+SELECT SUM(t1.quantity * t2.unit_price * t3.exchange_rate)
+FROM `tgs-talk-to-data.retail_dw.sales` AS t1
+JOIN `tgs-talk-to-data.retail_dw.products` AS t2 ON t1.product_key = t2.product_key
+JOIN `tgs-talk-to-data.retail_dw.exchange_rates` AS t3 ON t1.currency_code = t3.currency AND t1.order_date = t3.date
+WHERE t1.order_date BETWEEN '2019-12-01' AND '2019-12-31'
+ 
+Question: How many stores do we have?
+SQL:
+SELECT COUNT(t1.store_key)
+FROM `tgs-talk-to-data.retail_dw.stores` AS t1
+ 
+Question: What are the top 5 product categories by revenue?
+SQL:
+SELECT t2.category, SUM(t1.quantity * t2.unit_price * t3.exchange_rate) AS revenue
+FROM `tgs-talk-to-data.retail_dw.sales` AS t1
+JOIN `tgs-talk-to-data.retail_dw.products` AS t2 ON t1.product_key = t2.product_key
+JOIN `tgs-talk-to-data.retail_dw.exchange_rates` AS t3 ON t1.currency_code = t3.currency AND t1.order_date = t3.date
+GROUP BY t2.category
+ORDER BY revenue DESC
+LIMIT 5
+ 
+Question: What is our average order value?
+SQL:
+SELECT SUM(t1.quantity * t2.unit_price * t3.exchange_rate) / COUNT(DISTINCT t1.order_number)
+FROM `tgs-talk-to-data.retail_dw.sales` AS t1
+JOIN `tgs-talk-to-data.retail_dw.products` AS t2 ON t1.product_key = t2.product_key
+JOIN `tgs-talk-to-data.retail_dw.exchange_rates` AS t3 ON t1.currency_code = t3.currency AND t1.order_date = t3.date
+ 
+Question: What's the average age of our customers?
+SQL:
+SELECT AVG(DATE_DIFF(CURRENT_DATE(), t1.birthday, YEAR))
+FROM `tgs-talk-to-data.retail_dw.customers` AS t1
+"""
 
     return f"""You are a SQL assistant for The Gadget Store (TGS), a retail company.
 Your job is to turn a plain-English business question into a single, correct,
@@ -155,7 +200,9 @@ RULES (never break these):
 3. Use the fully-qualified table names in backticks: `tgs-talk-to-data.retail_dw.<table_name>`
 4. ALWAYS assign a short alias to every table you reference (e.g. `AS t1`), and use that alias for every column reference (e.g. `t1.order_date`). NEVER reference a column through the full `project.dataset.table.column` path directly -- the project ID contains hyphens, which breaks unaliased references.
 5. Return ONLY the SQL query, with no explanation, no markdown formatting -- UNLESS the question is ambiguous (see below).
- 
+6. When filtering on a text/string column (e.g. category, country, brand), ALWAYS use a case-insensitive comparison: `LOWER(column) = LOWER('value')`. Never assume the exact capitalization the user typed matches the database -- a mismatch here causes a silently WRONG answer (e.g. zero results), not an error, which is worse than a crash.
+7. "Continent" ALWAYS means `customers.continent`. The `stores` table has NO continent column and NO geography/region lookup table exists anywhere in this database -- never invent one. If you cannot find a column the question needs, do NOT silently substitute a different, similar-sounding column (e.g. answering with country when asked for continent) -- that produces a misleadingly wrong answer. Instead, use the CLARIFY format to say you cannot answer as asked.
+{few_shot_examples}
 AMBIGUITY CHECK (do this before writing any SQL):
 Common ambiguous cases in this project:
 - "sales" could mean revenue (money) or units sold (quantity)
