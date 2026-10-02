@@ -46,7 +46,8 @@ def process_question(
         initial_sql = generate_sql(effective_question)
     except Exception as gen_err:
         print(f"[Service Warning] Direct SQL generation fallback: {gen_err}")
-        initial_sql = f"SELECT SUM(quantity) as units_sold FROM `tgs-talk-to-data.retail_dw.sales` LIMIT 10"
+        project_id = os.getenv("GCP_PROJECT_ID", "talk-to-my-data-508110")
+        initial_sql = f"SELECT SUM(quantity) as units_sold FROM `{project_id}.retail_dw.sales` LIMIT 10"
 
     # 2. SQL Safety & Read-Only Guardrails Check (Pillar 3.2)
     # Note: If initial_sql is a CLARIFY: response, validate_sql will handle it safely

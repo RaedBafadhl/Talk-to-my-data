@@ -95,7 +95,7 @@ BigQuery Error Message:
 INSTRUCTIONS FOR CORRECTION:
 1. Carefully inspect the schema provided above for valid table and column names.
 2. Fix the error highlighted by BigQuery (e.g. invalid column name, wrong table reference, syntax error, grouping error, type mismatch).
-3. Ensure the corrected query strictly follows the rules (SELECT statements only, fully-qualified table names `tgs-talk-to-data.retail_dw.<table_name>`).
+3. Ensure the corrected query strictly follows the rules (SELECT statements only, fully-qualified table names `{PROJECT_ID}.retail_dw.<table_name>`).
 4. If, after reviewing the schema, the column or concept genuinely does not exist anywhere in the given schema, do NOT guess another plausible-sounding name -- respond with the CLARIFY format instead, explaining what's missing.
 5. Output ONLY the raw corrected SQL query (or a CLARIFY response) with no explanation and no markdown formatting.
 """
@@ -129,7 +129,7 @@ def execute_with_self_healing(
             print(
                 f"[Self-Healing Warning] Initial LLM generation unavailable ({gen_err}). Using fallback query structure."
             )
-            current_sql = f"SELECT SUM(quantity) as units_sold FROM `tgs-talk-to-data.retail_dw.sales` WHERE EXTRACT(YEAR FROM order_date) = 2025"
+            current_sql = f"SELECT SUM(quantity) as units_sold FROM `{PROJECT_ID}.retail_dw.sales` WHERE EXTRACT(YEAR FROM order_date) = 2025"
     else:
         current_sql = clean_sql_output(initial_sql)
 

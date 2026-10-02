@@ -151,7 +151,8 @@ def build_system_prompt(question: str) -> str:
     # against BigQuery and confirmed correct (see scripts/golden_dataset.py
     # history). Using real, proven examples rather than invented ones keeps
     # the prompt honest and means every pattern shown is genuinely reliable.
-    few_shot_examples = """
+    project_id = os.getenv("GCP_PROJECT_ID", "talk-to-my-data-508110")
+    few_shot_examples = f"""
 EXAMPLES (these are real, verified question-to-SQL patterns -- follow this style):
  
 Question: What was total revenue in December 2019?
@@ -161,14 +162,14 @@ SELECT SUM(t1.quantity * t2.unit_price * t3.exchange_rate) AS revenue
 Question: How many stores do we have?
 SQL:
 SELECT COUNT(t1.store_key) AS store_count
-FROM `tgs-talk-to-data.retail_dw.stores` AS t1
+FROM `{project_id}.retail_dw.stores` AS t1
  
 Question: What are the top 5 product categories by revenue?
 SQL:
 SELECT t2.category, SUM(t1.quantity * t2.unit_price * t3.exchange_rate) AS revenue
-FROM `tgs-talk-to-data.retail_dw.sales` AS t1
-JOIN `tgs-talk-to-data.retail_dw.products` AS t2 ON t1.product_key = t2.product_key
-JOIN `tgs-talk-to-data.retail_dw.exchange_rates` AS t3 ON t1.currency_code = t3.currency AND t1.order_date = t3.date
+FROM `{project_id}.retail_dw.sales` AS t1
+JOIN `{project_id}.retail_dw.products` AS t2 ON t1.product_key = t2.product_key
+JOIN `{project_id}.retail_dw.exchange_rates` AS t3 ON t1.currency_code = t3.currency AND t1.order_date = t3.date
 GROUP BY t2.category
 ORDER BY revenue DESC
 LIMIT 5
@@ -176,19 +177,19 @@ LIMIT 5
 Question: What is our average order value?
 SQL:
 SELECT SUM(t1.quantity * t2.unit_price * t3.exchange_rate) / COUNT(DISTINCT t1.order_number) AS average_order_value
-FROM `tgs-talk-to-data.retail_dw.sales` AS t1
-JOIN `tgs-talk-to-data.retail_dw.products` AS t2 ON t1.product_key = t2.product_key
-JOIN `tgs-talk-to-data.retail_dw.exchange_rates` AS t3 ON t1.currency_code = t3.currency AND t1.order_date = t3.date
+FROM `{project_id}.retail_dw.sales` AS t1
+JOIN `{project_id}.retail_dw.products` AS t2 ON t1.product_key = t2.product_key
+JOIN `{project_id}.retail_dw.exchange_rates` AS t3 ON t1.currency_code = t3.currency AND t1.order_date = t3.date
  
 Question: What's the average age of our customers?
 SQL:
 SELECT AVG(DATE_DIFF(CURRENT_DATE(), t1.birthday, YEAR)) AS average_age
-FROM `tgs-talk-to-data.retail_dw.customers` AS t1
+FROM `{project_id}.retail_dw.customers` AS t1
  
 Question: How many stores were opened after 2015?
 SQL:
 SELECT COUNT(t1.store_key) AS store_count
-FROM `tgs-talk-to-data.retail_dw.stores` AS t1
+FROM `{project_id}.retail_dw.stores` AS t1
 WHERE EXTRACT(YEAR FROM t1.open_date) > 2015
 """
 
@@ -199,7 +200,7 @@ READ-ONLY BigQuery SQL query.
 RULES (never break these):
 1. Only ever write SELECT statements. Never write INSERT, UPDATE, DELETE, DROP, ALTER, or any statement that changes data.
 2. Only use the tables and columns described in the schema below. Never invent a column or table name.
-3. Use the fully-qualified table names in backticks: `tgs-talk-to-data.retail_dw.<table_name>`
+3. Use the fully-qualified table names in backticks: `{project_id}.retail_dw.<table_name>`
 4. ALWAYS assign a short alias to every table you reference (e.g. `AS t1`), and use that alias for every column reference (e.g. `t1.order_date`). NEVER reference a column through the full `project.dataset.table.column` path directly -- the project ID contains hyphens, which breaks unaliased references.
 5. Return ONLY the SQL query, with no explanation, no markdown formatting -- UNLESS the question is ambiguous (see below).
 6. When filtering on a text/string column (e.g. category, country, brand), ALWAYS use a case-insensitive comparison: `LOWER(column) = LOWER('value')`. Never assume the exact capitalization the user typed matches the database -- a mismatch here causes a silently WRONG answer (e.g. zero results), not an error, which is worse than a crash.
