@@ -1,20 +1,8 @@
 """
 Pillar 2.1 -- Dynamic Schema Injection (end-to-end test)
 
-Uses the schema-aware system prompt from schema_context.py to actually call
-Google's Gemini model (via the Agent Platform / Vertex AI backend) and
-generate SQL from a plain-English question.
-
-NOTE: uses the google-genai library (the current, supported one), not the
-older google-cloud-aiplatform / vertexai.generative_models module, which
-Google fully removed in mid-2026.
-
-This is a MINIMAL first version -- just proves schema injection works.
-Few-shot examples (2.2), self-healing retries (2.3), and clarification (2.4)
-are separate tasks that build on top of this.
-
-Usage:
-    python src/llm/generate_sql.py "What was total revenue last month?"
+Uses the schema-aware system prompt from schema_context.py to call Google's Gemini model
+and generate SQL from a plain-English question.
 """
 
 import os
@@ -28,15 +16,31 @@ from schema_context import build_system_prompt
 
 load_dotenv()
 
-PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+PROJECT_ID = os.getenv("GCP_PROJECT_ID", "talk-to-my-data-508110")
 REGION = os.getenv("GCP_REGION", "europe-west4")
+MODEL_NAME = "gemini-2.5-flash"
 
-MODEL_NAME = "gemini-2.5-flash"  # check Model Garden in GCP Console if this errors -- model names change
+
+def get_genai_client() -> genai.Client:
+    """
+    Returns a configured Google GenAI client instance.
+    Prioritizes GEMINI_API_KEY if provided, otherwise defaults to Vertex AI configuration.
+    """
+    api_key = os.getenv("GEMINI_API_KEY")
+    if api_key:
+        return genai.Client(api_key=api_key)
+
+    if PROJECT_ID:
+        try:
+            return genai.Client(vertexai=True, project=PROJECT_ID, location=REGION)
+        except Exception:
+            pass
+
+    return genai.Client()
 
 
 def generate_sql(question: str) -> str:
-    client = genai.Client(vertexai=True, project=PROJECT_ID, location=REGION)
-
+    client = get_genai_client()
     system_prompt = build_system_prompt(question)
 
     response = client.models.generate_content(
@@ -61,6 +65,3 @@ if __name__ == "__main__":
     print("-" * 70)
     print(sql)
     print("-" * 70)
-    print("\nNOTE: this SQL has NOT been validated or executed yet -- that's")
-    print("Pillar 3's job (3.2 SQL Validation). This script only proves the")
-    print("schema-aware generation step works.")

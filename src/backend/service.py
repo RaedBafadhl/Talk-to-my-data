@@ -2,14 +2,14 @@
 Pillar 3.1 -- Orchestration Service Layer
 
 Coordinates the full end-to-end question answering pipeline:
-UI / API -> SQL Generation & Clarification Check -> SQL Safety Check (3.2) -> BigQuery Self-Healing (2.3) -> Formatting & KPIs (3.3 & 3.4) -> UI Response
+UI / API -> Input Security Pre-Check -> SQL Generation & Clarification Check -> SQL Safety Guardrails (3.2) -> BigQuery Self-Healing (2.3) -> Formatting & KPIs (3.3 & 3.4) -> UI Response
 """
 
 import os
 import sys
 from typing import Dict, Any, Optional
 
-src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+src_dir = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), "..")))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
@@ -28,7 +28,7 @@ def process_question(
     Executes the complete Talk-to-my-Data backend pipeline.
 
     Args:
-        question (str): Plain-English business question.
+        question (str): Plain-English business question or input.
         conversation_id (str, optional): Session conversation identifier.
         clarification_answer (str, optional): User's response if answering a previous clarification.
 
@@ -38,6 +38,19 @@ def process_question(
     effective_question = question.strip()
     if clarification_answer and clarification_answer.strip():
         effective_question = f"{effective_question} (Clarification detail: {clarification_answer.strip()})"
+
+    # 0. Immediate Security Pre-Check on Input Question
+    # If the user typed raw SQL attempting mutation (e.g. "DROP TABLE sales;")
+    tokens_upper = set(effective_question.upper().split())
+    mutating_keywords = {"DROP", "DELETE", "INSERT", "UPDATE", "ALTER", "TRUNCATE", "CREATE", "GRANT", "REVOKE"}
+    if mutating_keywords.intersection(tokens_upper) or effective_question.rstrip(";").endswith("TABLE") or ";" in effective_question:
+        is_input_safe, input_sec_reason = validate_sql(effective_question)
+        if not is_input_safe:
+            print(f"[Service Guardrail Blocked Input] Unsafe question/SQL input detected: {input_sec_reason}")
+            return {
+                "status": "error",
+                "message": f"Security Guardrail Violation: {input_sec_reason}"
+            }
 
     initial_sql = None
 
@@ -50,7 +63,6 @@ def process_question(
         initial_sql = f"SELECT SUM(quantity) as units_sold FROM `{project_id}.retail_dw.sales` LIMIT 10"
 
     # 2. SQL Safety & Read-Only Guardrails Check (Pillar 3.2)
-    # Note: If initial_sql is a CLARIFY: response, validate_sql will handle it safely
     if not initial_sql.strip().startswith("CLARIFY:"):
         is_safe, security_reason = validate_sql(initial_sql)
         if not is_safe:
@@ -110,7 +122,7 @@ def process_question(
 
 if __name__ == "__main__":
     print("Testing Service Pipeline locally...")
-    test_q = "What were total sales in 2025?"
+    test_q = "DROP TABLE sales;"
     res = process_question(test_q)
-    print("Service Result:")
+    print("Service Result for DROP TABLE:")
     print(res)
