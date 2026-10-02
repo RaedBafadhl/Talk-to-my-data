@@ -2,21 +2,33 @@
 Pillar 3.1 -- Orchestration Service Layer
 
 Coordinates the full end-to-end question answering pipeline:
-UI / API -> Input Security Pre-Check -> SQL Generation & Clarification Check -> SQL Safety Guardrails (3.2) -> BigQuery Self-Healing (2.3) -> Formatting & KPIs (3.3 & 3.4) -> UI Response
+UI / API -> Input Security Pre-Check -> Ambiguity Check -> SQL Generation -> SQL Safety Guardrails (3.2) -> BigQuery Self-Healing (2.3) -> Formatting & KPIs (3.3 & 3.4) -> UI Response
 """
 
 import os
 import sys
 from typing import Dict, Any, Optional
 
-src_dir = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), "..")))
+src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
 from llm.generate_sql import generate_sql
-from llm.self_healing import execute_with_self_healing
+from llm.self_healing import execute_with_self_healing, check_clarification
 from backend.security import validate_sql
 from backend.formatter import format_response
+
+
+def check_ambiguity_heuristic(question: str) -> Optional[str]:
+    """
+    Fallback ambiguity detector if LLM API is unavailable or offline.
+    """
+    q = question.lower().strip()
+    if "sales" in q and not any(k in q for k in ["revenue", "units", "quantity", "euro", "usd", "amount"]):
+        return "When you say 'sales', do you mean total revenue in currency or units sold?"
+    if "country" in q and not any(k in q for k in ["customer", "store"]):
+        return "Do you mean the customer's country or the store's country?"
+    return None
 
 
 def process_question(
@@ -40,7 +52,6 @@ def process_question(
         effective_question = f"{effective_question} (Clarification detail: {clarification_answer.strip()})"
 
     # 0. Immediate Security Pre-Check on Input Question
-    # If the user typed raw SQL attempting mutation (e.g. "DROP TABLE sales;")
     tokens_upper = set(effective_question.upper().split())
     mutating_keywords = {"DROP", "DELETE", "INSERT", "UPDATE", "ALTER", "TRUNCATE", "CREATE", "GRANT", "REVOKE"}
     if mutating_keywords.intersection(tokens_upper) or effective_question.rstrip(";").endswith("TABLE") or ";" in effective_question:
@@ -52,25 +63,39 @@ def process_question(
                 "message": f"Security Guardrail Violation: {input_sec_reason}"
             }
 
+    # 1. SQL Generation & Ambiguity Detection
     initial_sql = None
-
-    # 1. SQL Generation
     try:
         initial_sql = generate_sql(effective_question)
     except Exception as gen_err:
-        print(f"[Service Warning] Direct SQL generation fallback: {gen_err}")
+        print(f"[Service Warning] Direct SQL generation LLM call failed: {gen_err}")
+        # Check if question is inherently ambiguous before applying fallback query
+        heuristic_clarify = check_ambiguity_heuristic(effective_question)
+        if heuristic_clarify and not clarification_answer:
+            return {
+                "status": "needs_clarification",
+                "clarification_question": heuristic_clarify
+            }
         project_id = os.getenv("GCP_PROJECT_ID", "talk-to-my-data-508110")
         initial_sql = f"SELECT SUM(quantity) as units_sold FROM `{project_id}.retail_dw.sales` LIMIT 10"
 
+    # Check if generated output is a clarification request
+    clarification = check_clarification(initial_sql)
+    if clarification or (initial_sql.startswith("CLARIFY:") and not clarification_answer):
+        clarify_q = clarification or initial_sql.replace("CLARIFY:", "").strip()
+        return {
+            "status": "needs_clarification",
+            "clarification_question": clarify_q
+        }
+
     # 2. SQL Safety & Read-Only Guardrails Check (Pillar 3.2)
-    if not initial_sql.strip().startswith("CLARIFY:"):
-        is_safe, security_reason = validate_sql(initial_sql)
-        if not is_safe:
-            print(f"[Service Rejected] Unsafe SQL detected: {security_reason}")
-            return {
-                "status": "error",
-                "message": f"Security Guardrail Violation: {security_reason}"
-            }
+    is_safe, security_reason = validate_sql(initial_sql)
+    if not is_safe:
+        print(f"[Service Rejected] Unsafe SQL detected: {security_reason}")
+        return {
+            "status": "error",
+            "message": f"Security Guardrail Violation: {security_reason}"
+        }
 
     # 3. BigQuery Execution with Self-Healing Feedback Loop (Pillar 2.3 & 1.2)
     try:
@@ -122,7 +147,7 @@ def process_question(
 
 if __name__ == "__main__":
     print("Testing Service Pipeline locally...")
-    test_q = "DROP TABLE sales;"
+    test_q = "What were sales last month?"
     res = process_question(test_q)
-    print("Service Result for DROP TABLE:")
+    print(f"Service Result for '{test_q}':")
     print(res)
