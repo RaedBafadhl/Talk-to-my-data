@@ -140,7 +140,7 @@ def build_summary(
         values = ", ".join(
             f"{key}: {_format_value(key, value)}" for key, value in row.items()
         )
-        return f"The query returned one result: {values}."
+        return values.capitalize() + "."
 
     dimension_field = _find_dimension_field(rows)
     numeric_field = _find_numeric_field(rows, exclude=dimension_field)
@@ -155,13 +155,12 @@ def build_summary(
             )
 
             return (
-                f"The query returned {len(rows)} results. "
                 f"The highest {numeric_field.replace('_', ' ')} "
                 f"was {_format_value(numeric_field, highest[numeric_field])} "
                 f"for {highest.get(dimension_field)}."
             )
 
-    return f"The query returned {len(rows)} results."
+    return f"Found {len(rows)} results."
 
 
 def format_response(
