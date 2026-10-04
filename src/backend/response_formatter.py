@@ -13,21 +13,18 @@ TIME_FIELDS = {
     "delivery_date",
 }
 
-MONEY_KEYWORDS = {
-    "revenue",
-    "profit",
-    "price",
-    "cost",
-    "value",
-    "margin",
-    "aov",
-    "order_value",
-}
+# Money fields are shown as $1,234.56. "margin" is NOT here on purpose: a
+# margin is a ratio (0.58 = 58%), handled separately below.
+MONEY_KEYWORDS = {"revenue", "profit", "price", "cost", "value", "aov", "order_value"}
+RATIO_KEYWORDS = ("margin", "growth", "rate", "share", "ratio", "retention")
+PCT_KEYWORDS = ("pct", "percent")
 
 # NOTE: Decimal added -- BigQuery returns aggregated numeric results (SUM,
 # AVG, etc.) as Decimal, not plain int/float. Without this, charts and rich
 # summaries silently fail to detect the numeric column.
 NUMBER_TYPES = (int, float, Decimal)
+
+DATA_RANGE_NOTE = "Our data covers January 2016 to February 2021."
 
 
 def _is_numeric(value: Any) -> bool:
@@ -49,13 +46,51 @@ def _is_money_field(field_name: str) -> bool:
     return any(keyword in name for keyword in MONEY_KEYWORDS)
 
 
+def _value_kind(field_name: str, value: Any) -> str:
+    """
+    Decides how a number should be displayed:
+    year | percent_points (already x100) | percent_fraction (0.58 -> 58%) |
+    money | integer | number
+    """
+    name = field_name.lower()
+    if "year" in name:
+        return "year"
+    if any(k in name for k in PCT_KEYWORDS):
+        return "percent_points"
+    if any(k in name for k in RATIO_KEYWORDS) and "exchange" not in name:
+        if abs(value) <= 5:
+            return "percent_fraction"
+        if "margin" in name:
+            return "money"  # a margin in dollars, not a ratio
+        return "percent_points"
+    if _is_money_field(name):
+        return "money"
+    return "integer" if isinstance(value, int) else "number"
+
+
 def _format_value(field_name: str, value: Any) -> str:
-    """Formats a value for display, adding a $ prefix for money fields."""
-    if _is_money_field(field_name) and _is_numeric(value):
+    """Formats a value for display: $ for money, % for ratios, 2 decimals."""
+    if value is None:
+        return "no data"
+    if not _is_numeric(value):
+        return str(value)
+
+    kind = _value_kind(field_name, value)
+    if kind == "year":
+        return str(int(value))
+    if kind == "money":
         return f"${value:,.2f}"
-    if _is_numeric(value):
-        return f"{value:,}" if isinstance(value, int) else f"{value:,.2f}"
-    return str(value)
+    if kind == "percent_fraction":
+        return f"{value * 100:,.2f}%"
+    if kind == "percent_points":
+        return f"{value:,.2f}%"
+    if kind == "integer":
+        return f"{value:,}"
+    return f"{value:,.2f}"
+
+
+def _label(field_name: str) -> str:
+    return field_name.replace("_", " ").strip()
 
 
 def _find_numeric_field(rows: list[dict], exclude: str | None = None) -> str | None:
@@ -133,14 +168,18 @@ def build_summary(
     Create a simple deterministic summary.
     """
     if not rows:
-        return "No matching data was found for this question."
+        return f"No matching data was found for this question. {DATA_RANGE_NOTE}"
 
     if len(rows) == 1:
         row = rows[0]
-        values = ", ".join(
-            f"{key}: {_format_value(key, value)}" for key, value in row.items()
+        # e.g. "last month" in a dataset that ends in Feb 2021 -> NULL result
+        if all(v is None for v in row.values()):
+            return f"No data found for that period. {DATA_RANGE_NOTE}"
+
+        text = ", ".join(
+            f"{_label(key)}: {_format_value(key, value)}" for key, value in row.items()
         )
-        return values.capitalize() + "."
+        return text[0].upper() + text[1:]
 
     dimension_field = _find_dimension_field(rows)
     numeric_field = _find_numeric_field(rows, exclude=dimension_field)
@@ -155,7 +194,7 @@ def build_summary(
             )
 
             return (
-                f"The highest {numeric_field.replace('_', ' ')} "
+                f"The highest {_label(numeric_field)} "
                 f"was {_format_value(numeric_field, highest[numeric_field])} "
                 f"for {highest.get(dimension_field)}."
             )

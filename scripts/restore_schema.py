@@ -1,4 +1,18 @@
-# Database Schema
+"""
+Writes contracts/schema.md with the correct markdown structure.
+
+Why this exists: the AI reads contracts/schema.md on every question. If that file
+loses its markdown (## headings, `backticks`, | table pipes |) -- for example after
+copying rendered text instead of the raw file -- the code finds NO tables and the AI
+is sent no schema at all, so it invents column names.
+
+Usage (from the project root):
+    python scripts/restore_schema.py
+"""
+
+from pathlib import Path
+
+SCHEMA = r"""# Database Schema
 
 Source dataset: **Global Electronics Retailer** (Maven Analytics / Microsoft, public domain)
 
@@ -113,3 +127,15 @@ The LLM should use this table when it sees these words in a user's question:
 | "delivered" / "undelivered" order | there is no status column -- `delivery_date IS NOT NULL` means delivered, `delivery_date IS NULL` means undelivered |
 
 **Note:** if a question is genuinely ambiguous (e.g. "sales" could mean revenue or units), the assistant should ask a clarification question rather than guess -- see `api.md`.
+"""
+
+target = Path(__file__).resolve().parent.parent / "contracts" / "schema.md"
+target.parent.mkdir(exist_ok=True)
+if target.exists():
+    backup = target.with_name("schema_backup.md")
+    backup.write_text(
+        target.read_text(encoding="utf-8", errors="replace"), encoding="utf-8"
+    )
+    print(f"Backed up the old file to {backup}")
+target.write_text(SCHEMA, encoding="utf-8", newline="\n")
+print(f"Wrote {target} ({len(SCHEMA.splitlines())} lines)")
