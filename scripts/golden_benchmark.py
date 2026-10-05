@@ -36,7 +36,7 @@ def q(question, category, expect=None, text=None, rows=None, clarify=False, sour
     """
     expect : list of (value, tolerance) alternatives for the FIRST number in the
              first result row. Alternatives let a ratio be accepted as either
-             0.4595 or 45.95, since the AI may phrase it either way.
+             0.4281 or 42.81, since the AI may phrase it either way.
     text   : expected FIRST text value in the first row (e.g. top category).
     rows   : expected number of result rows.
     clarify: True if the correct behaviour is to ask a clarifying question.
@@ -61,45 +61,45 @@ BENCHMARK = [
     q(
         "What was total revenue in December 2019?",
         "Revenue",
-        expect=[(2486562.81, 1)],
-        source="BigQuery Console + kpi.py",
+        expect=[(2477295.85, 1)],
+        source="BigQuery recompute (USD formula)",
     ),
     q(
         "What was total revenue in 2019?",
         "Revenue",
-        expect=[(18307017.97, 100)],
-        source="EDA",
+        expect=[(18264382.48, 100)],
+        source="BigQuery recompute (USD formula)",
     ),
     q(
         "What was total revenue in 2018?",
         "Revenue",
-        expect=[(12543103.18, 100)],
-        source="EDA",
+        expect=[(12788960.66, 100)],
+        source="BigQuery recompute (USD formula)",
     ),
     q(
         "What was total revenue in 2020?",
         "Revenue",
-        expect=[(9322165.94, 100)],
-        source="EDA",
+        expect=[(9294632.14, 100)],
+        source="BigQuery recompute (USD formula)",
     ),
     q(
         "What was total revenue in 2016?",
         "Revenue",
-        expect=[(6850538.24, 100)],
-        source="EDA",
+        expect=[(6946793.56, 100)],
+        source="BigQuery recompute (USD formula)",
     ),
     q(
         "What was the revenue growth from 2018 to 2019?",
         "Revenue",
-        expect=[(0.4595, 0.005), (45.95, 0.05)],
-        source="derived from verified 2018 and 2019 revenue",
+        expect=[(0.4281, 0.005), (42.81, 0.05)],
+        source="derived from the recomputed 2018 and 2019 revenue",
     ),
     # ---- Core KPIs ----
     q(
         "What is our average order value?",
         "KPI",
-        expect=[(2102.46, 1)],
-        source="EDA + kpi.py",
+        expect=[(2117.89, 1)],
+        source="BigQuery recompute (USD formula)",
     ),
     q(
         "What are the top 5 product categories by revenue?",
@@ -112,13 +112,13 @@ BENCHMARK = [
         "Which continent generates the most revenue?",
         "KPI",
         text="North America",
-        source="EDA (revenue by continent)",
+        source="BigQuery recompute (USD formula)",
     ),
     q(
         "What's the profit margin on computers?",
         "KPI",
-        expect=[(0.5844, 0.005), (58.44, 0.5)],
-        source="documented formula; consistent across runs",
+        expect=[(0.5843, 0.005), (58.43, 0.5)],
+        source="BigQuery recompute (USD formula)",
     ),
     # ---- Scale ----
     q(
@@ -144,8 +144,8 @@ BENCHMARK = [
     q(
         "What's the total revenue from GBP transactions?",
         "Geography",
-        expect=[(5449533.23, 10)],
-        source="EDA (UK customers)",
+        expect=[(7084088.12, 10)],
+        source="BigQuery recompute (revenue by currency, in USD)",
     ),
     q(
         "How many customers live in London?",

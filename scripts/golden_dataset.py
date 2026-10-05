@@ -29,25 +29,25 @@ GOLDEN_DATASET = [
     {
         "question": "What was total revenue in December 2019?",
         "expect_clarification": False,
-        "expected_answer": 2486562.81,
+        "expected_answer": 2477295.85,
         "tolerance": 1.0,
     },
     {
         "question": "What was total revenue in 2019?",
         "expect_clarification": False,
-        "expected_answer": 18307017.97,
+        "expected_answer": 18264382.48,
         "tolerance": 100.0,
     },
     {
         "question": "What was total revenue in 2018?",
         "expect_clarification": False,
-        "expected_answer": 12543103.18,
+        "expected_answer": 12788960.66,
         "tolerance": 100.0,
     },
     {
         "question": "What was total revenue in 2020?",
         "expect_clarification": False,
-        "expected_answer": 9322165.94,
+        "expected_answer": 9294632.14,
         "tolerance": 100.0,
     },
     {

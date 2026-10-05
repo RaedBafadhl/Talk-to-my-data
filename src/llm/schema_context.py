@@ -99,6 +99,11 @@ def select_relevant_tables(question: str) -> set:
         selected.add("stores")
     if any(term in q for term in money_terms):
         selected.add("products")
+
+    # exchange_rates is only needed when a question asks for a LOCAL currency;
+    # USD revenue is just quantity * unit_price (prices are already in USD).
+    local_currency_terms = {"euro", "pound", "local currency", "exchange rate", "in eur", "in gbp", "in cad", "in aud"}
+    if any(term in q for term in local_currency_terms):
         selected.add("exchange_rates")
 
     # "country" is genuinely ambiguous here -- could mean customer country
@@ -158,7 +163,7 @@ EXAMPLES (these are real, verified question-to-SQL patterns -- follow this style
  
 Question: What was total revenue in December 2019?
 SQL:
-SELECT SUM(t1.quantity * t2.unit_price * t3.exchange_rate) AS revenue
+SELECT SUM(t1.quantity * t2.unit_price) AS revenue
  
 Question: How many stores do we have?
 SQL:
@@ -167,20 +172,18 @@ FROM `{project_id}.retail_dw.stores` AS t1
  
 Question: What are the top 5 product categories by revenue?
 SQL:
-SELECT t2.category, SUM(t1.quantity * t2.unit_price * t3.exchange_rate) AS revenue
+SELECT t2.category, SUM(t1.quantity * t2.unit_price) AS revenue
 FROM `{project_id}.retail_dw.sales` AS t1
 JOIN `{project_id}.retail_dw.products` AS t2 ON t1.product_key = t2.product_key
-JOIN `{project_id}.retail_dw.exchange_rates` AS t3 ON t1.currency_code = t3.currency AND t1.order_date = t3.date
 GROUP BY t2.category
 ORDER BY revenue DESC
 LIMIT 5
  
 Question: What is our average order value?
 SQL:
-SELECT SUM(t1.quantity * t2.unit_price * t3.exchange_rate) / COUNT(DISTINCT t1.order_number) AS average_order_value
+SELECT SUM(t1.quantity * t2.unit_price) / COUNT(DISTINCT t1.order_number) AS average_order_value
 FROM `{project_id}.retail_dw.sales` AS t1
 JOIN `{project_id}.retail_dw.products` AS t2 ON t1.product_key = t2.product_key
-JOIN `{project_id}.retail_dw.exchange_rates` AS t3 ON t1.currency_code = t3.currency AND t1.order_date = t3.date
  
 Question: What's the average age of our customers?
 SQL:

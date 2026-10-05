@@ -18,7 +18,7 @@ One row per line item within an order.
 | quantity | INTEGER | Units sold in this line item |
 | customer_key | INTEGER | Foreign key -> `customers.customer_key` |
 | store_key | INTEGER | Foreign key -> `stores.store_key` |
-| currency_code | STRING | e.g. "USD", "EUR", "GBP" -- needed to convert to a common currency using `exchange_rates` |
+| currency_code | STRING | Currency the customer paid in, e.g. "USD", "EUR", "GBP". Prices are already in USD, so this is NOT needed to compute USD revenue |
 | delivery_date | DATE | Can be null if not yet delivered |
 
 ## Table: `products`
@@ -30,8 +30,8 @@ One row per product.
 | product_name | STRING | |
 | brand | STRING | |
 | color | STRING | |
-| unit_cost | DECIMAL | What it costs the retailer (cost per unit) |
-| unit_price | DECIMAL | What the customer pays (selling price per unit) |
+| unit_cost | DECIMAL | What it costs the retailer (cost per unit), in USD |
+| unit_price | DECIMAL | What the customer pays (selling price per unit), in USD |
 | category | STRING | e.g. "Audio", "Computers" |
 | subcategory | STRING | e.g. "Headphones", "Laptops" |
 
@@ -70,13 +70,13 @@ One row per physical store.
 | open_date | DATE | |
 
 ## Table: `exchange_rates`
-One row per currency per date -- used to convert all sales into a common currency (recommend USD) for consistent revenue KPIs.
+One row per currency per date. IMPORTANT: `products.unit_price` and `products.unit_cost` are ALREADY in USD, so revenue and profit in USD never need this table. Use it only to show an amount in a customer's local currency (local amount = USD amount * exchange_rate).
 
 | Column | Type | Notes |
 |---|---|---|
 | date | DATE | |
 | currency | STRING | Matches `sales.currency_code` |
-| exchange_rate | DECIMAL | Rate to USD on that date |
+| exchange_rate | DECIMAL | Units of local currency per 1 USD on that date (EUR 0.91 means 1 USD = 0.91 EUR) |
 
 ---
 
@@ -97,9 +97,9 @@ The LLM should use this table when it sees these words in a user's question:
 
 | Business term | SQL meaning |
 |---|---|
-| "revenue" / "sales" (always in USD) | `SUM(sales.quantity * products.unit_price * exchange_rates.exchange_rate)` |
+| "revenue" / "sales" (always in USD) | `SUM(sales.quantity * products.unit_price)` -- unit_price is already in USD, so do NOT multiply by exchange_rate and do NOT join exchange_rates |
 | "units sold" / "volume" | `SUM(sales.quantity)` |
-| "profit" | `SUM(sales.quantity * (products.unit_price - products.unit_cost) * exchange_rates.exchange_rate)` |
+| "profit" | `SUM(sales.quantity * (products.unit_price - products.unit_cost))` -- already USD, no exchange rate |
 | "average order value" / "AOV" | total revenue divided by `COUNT(DISTINCT sales.order_number)` |
 | "top product" | highest `SUM(quantity)` or `SUM(revenue)`, grouped by `product_name` |
 | "by country" / "by region" | `GROUP BY customers.country` or `stores.country` -- confirm which one the user means (customer location vs. store location can differ) |
@@ -109,7 +109,8 @@ The LLM should use this table when it sees these words in a user's question:
 | "SKU" / "item" | a single `product_key` |
 | "repeat customer" / "loyal customer" | a `customer_key` with more than 1 distinct `order_number` |
 | "best-seller" | highest `SUM(quantity)`, not necessarily highest revenue -- confirm which the user means |
-| "margin" / "profit margin" | profit divided by revenue, i.e. `SUM(quantity * (unit_price - unit_cost) * exchange_rate) / SUM(quantity * unit_price * exchange_rate)` |
+| "margin" / "profit margin" | profit divided by revenue, i.e. `SUM(quantity * (unit_price - unit_cost)) / SUM(quantity * unit_price)` |
+| "in euros" / "in pounds" / "in local currency" | USD amount multiplied by `exchange_rates.exchange_rate` (units of local currency per 1 USD); join `exchange_rates` on currency and date. Only needed when a question asks for a local currency |
 | "delivered" / "undelivered" order | there is no status column -- `delivery_date IS NOT NULL` means delivered, `delivery_date IS NULL` means undelivered |
 
 **Note:** if a question is genuinely ambiguous (e.g. "sales" could mean revenue or units), the assistant should ask a clarification question rather than guess -- see `api.md`.

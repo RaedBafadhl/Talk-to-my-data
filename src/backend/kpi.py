@@ -51,10 +51,9 @@ def get_revenue(start_date: str = None, end_date: str = None) -> dict:
         where_clause = f"WHERE s.order_date BETWEEN '{start_date}' AND '{end_date}'"
 
     sql = f"""
-        SELECT ROUND(SUM(s.quantity * p.unit_price * e.exchange_rate), 2) AS revenue
+        SELECT ROUND(SUM(s.quantity * p.unit_price), 2) AS revenue
         FROM `{PROJECT_ID}.{DATASET}.sales` s
         JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-        JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
         {where_clause}
     """
     result = _query(sql)
@@ -73,14 +72,13 @@ def get_top_products(by: str = "revenue", limit: int = 5) -> dict:
         order_expr = "SUM(s.quantity)"
         value_label = "units_sold"
     else:
-        order_expr = "SUM(s.quantity * p.unit_price * e.exchange_rate)"
+        order_expr = "SUM(s.quantity * p.unit_price)"
         value_label = "revenue"
 
     sql = f"""
         SELECT p.category, ROUND({order_expr}, 2) AS {value_label}
         FROM `{PROJECT_ID}.{DATASET}.sales` s
         JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-        JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
         GROUP BY p.category
         ORDER BY {value_label} DESC
         LIMIT {limit}
@@ -91,10 +89,9 @@ def get_top_products(by: str = "revenue", limit: int = 5) -> dict:
 def get_average_order_value() -> dict:
     """KPI 3: Average Order Value (AOV), overall."""
     sql = f"""
-        SELECT ROUND(SUM(s.quantity * p.unit_price * e.exchange_rate) / COUNT(DISTINCT s.order_number), 2) AS aov
+        SELECT ROUND(SUM(s.quantity * p.unit_price) / COUNT(DISTINCT s.order_number), 2) AS aov
         FROM `{PROJECT_ID}.{DATASET}.sales` s
         JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-        JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
     """
     result = _query(sql)
     return {
@@ -107,10 +104,9 @@ def get_category_share() -> dict:
     """KPI 4: Category sales share (% of total revenue by category)."""
     sql = f"""
         WITH category_revenue AS (
-            SELECT p.category, SUM(s.quantity * p.unit_price * e.exchange_rate) AS revenue
+            SELECT p.category, SUM(s.quantity * p.unit_price) AS revenue
             FROM `{PROJECT_ID}.{DATASET}.sales` s
             JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-            JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
             GROUP BY p.category
         )
         SELECT category, ROUND(revenue, 2) AS revenue,
@@ -276,13 +272,13 @@ if __name__ == "__main__":
     print("PART 1: GUARANTEED KPIs -- verified against real EDA values")
     print("=" * 70)
 
-    print("\n1. Revenue (December 2019) -- expect 2486562.81:")
+    print("\n1. Revenue (December 2019) -- expect 2477295.85:")
     print(get_revenue("2019-12-01", "2019-12-31"))
 
     print("\n2. Top products by revenue -- expect Computers first:")
     print(get_top_products(by="revenue", limit=5))
 
-    print("\n3. Average Order Value -- expect 2102.46:")
+    print("\n3. Average Order Value -- expect 2117.89:")
     print(get_average_order_value())
 
     print("\n4. Category share:")
