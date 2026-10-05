@@ -57,9 +57,9 @@ GOLDEN_DATASET = [
         "tolerance": 1,
     },
     {
-        "question": "How many stores do we have?",
+        "question": "How many physical stores do we have?",
         "expect_clarification": False,
-        "expected_answer": 67,
+        "expected_answer": 66,
         "tolerance": 0,
     },
     {

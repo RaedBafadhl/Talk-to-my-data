@@ -517,7 +517,7 @@ def show_about_data():
         st.caption("Location, demographics")
     with c2:
         st.markdown("**Stores**")
-        st.caption("67 locations + online")
+        st.caption("66 locations + online")
         st.markdown("**Exchange Rates**")
         st.caption("Converts everything to USD")
 
