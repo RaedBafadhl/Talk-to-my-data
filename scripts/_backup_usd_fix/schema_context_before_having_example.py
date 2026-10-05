@@ -195,16 +195,6 @@ SQL:
 SELECT COUNT(t1.store_key) AS store_count
 FROM `{project_id}.retail_dw.stores` AS t1
 WHERE EXTRACT(YEAR FROM t1.open_date) > 2015
-
-Question: How many customers have placed more than 3 orders?
-SQL:
-SELECT COUNT(*) AS customer_count
-FROM (
-  SELECT t1.customer_key
-  FROM `{project_id}.retail_dw.sales` AS t1
-  GROUP BY t1.customer_key
-  HAVING COUNT(DISTINCT t1.order_number) > 3
-) AS qualifying_customers
 """
 
     return f"""You are a SQL assistant for The Gadget Store (TGS), a retail company.

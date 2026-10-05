@@ -1,4 +1,3 @@
-import re
 from typing import Any
 from decimal import Decimal
 
@@ -203,7 +202,7 @@ def build_summary(
     return f"Found {len(rows)} results."
 
 
-def _format_response_raw(
+def format_response(
     question: str,
     sql: str,
     rows: list[dict],
@@ -218,33 +217,3 @@ def _format_response_raw(
         "table": rows,
         "chart": build_chart_schema(rows),
     }
-
-
-GROUPING_WORDS = re.compile(r"\b(each|per|by|every|breakdown|split|grouped)\b")
- 
- 
-def normalize_group_counts(question: str, rows: list[dict]) -> list[dict]:
-    """
-    Collapse "one row per group" into the single count it really represents.
-    See apply_count_shape_fix.py for the full explanation.
-    """
-    if len(rows) < 2 or len(rows[0]) != 1:
-        return rows
-    (column,) = rows[0].keys()
-    values = [row.get(column) for row in rows]
-    if not all(_is_numeric(v) for v in values):
-        return rows
- 
-    all_ones = all(v == 1 for v in values)
-    q = question.strip().lower()
-    counting_question = q.startswith("how many") and not GROUPING_WORDS.search(q)
-    if all_ones or (counting_question and len(rows) >= 20):
-        return [{column: len(rows)}]
-    return rows
- 
- 
-def format_response(question: str, sql: str, rows: list[dict]) -> dict:
-    """
-    Convert raw SQL results into the API response format.
-    """
-    return _format_response_raw(question, sql, normalize_group_counts(question, rows))
