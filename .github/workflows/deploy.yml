@@ -8,8 +8,8 @@ on:
       target:
         description: GCP environment
         type: choice
-        options: [raed, personal]
-        default: raed
+        options: [personal, raed]
+        default: personal
         required: true
 
 permissions:
@@ -17,7 +17,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: deployment-${{ github.event.inputs.target || 'raed' }}
+  group: deployment-${{ github.event.inputs.target || 'personal' }}
   cancel-in-progress: false
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      TARGET_ENVIRONMENT: ${{ github.event.inputs.target || 'raed' }}
+      TARGET_ENVIRONMENT: ${{ github.event.inputs.target || 'personal' }}
     steps:
       - uses: actions/checkout@v4
 

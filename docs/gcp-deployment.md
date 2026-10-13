@@ -1,10 +1,11 @@
 # GCP deployment
 
-Pushes to `main` deploy to **raed**, project `tgs-talk-to-data` in
+Pushes to `main` deploy to **personal**, project `talk-to-my-data-508110` in
 `europe-west4`. GitHub Actions also supports a manual `target` selection:
 `raed` or `personal`. Each environment has its own configuration, local
 Terraform working directory, remote state bucket and deployment concurrency
-group. The existing personal services are retained.
+group. The default deployment uses federation and does not depend on
+Raed's `GCP_CREDENTIALS` secret. Raed is an optional manually selected target.
 
 ## Configuration and authentication
 
@@ -49,13 +50,13 @@ resource-scoped permissions.
 Local commands, with credentials for the selected project:
 
 ```sh
-python scripts/deployment.py raed init
-python scripts/deployment.py raed adopt --image-tag COMMIT_SHA
-python scripts/deployment.py raed registry --image-tag COMMIT_SHA
+python scripts/deployment.py personal init
+python scripts/deployment.py personal adopt --image-tag COMMIT_SHA
+python scripts/deployment.py personal registry --image-tag COMMIT_SHA
 # Build and push both images for COMMIT_SHA before planning service updates.
-python scripts/deployment.py raed plan --image-tag COMMIT_SHA
-python scripts/deployment.py raed apply --image-tag COMMIT_SHA
-python scripts/deployment.py raed verify
+python scripts/deployment.py personal plan --image-tag COMMIT_SHA
+python scripts/deployment.py personal apply --image-tag COMMIT_SHA
+python scripts/deployment.py personal verify
 ```
 
 ## Foundation management
@@ -97,7 +98,7 @@ command deliberately only reconnects to the configured backend.
 SQL helper templates are environment-independent:
 
 ```sh
-python scripts/bigquery/run_sql.py raed scripts/eda_queries.sql --dry-run
+python scripts/bigquery/run_sql.py personal scripts/eda_queries.sql --dry-run
 ```
 
 Cloud Build image paths use `$PROJECT_ID`. Select the project explicitly if
