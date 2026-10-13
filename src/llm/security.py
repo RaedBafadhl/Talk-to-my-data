@@ -106,7 +106,7 @@ def validate_sql(sql: str) -> Tuple[bool, str]:
 if __name__ == "__main__":
     # Quick self-test
     test_cases = [
-        ("SELECT * FROM `tgs-talk-to-data.retail_dw.sales` LIMIT 10", True),
+        ("SELECT * FROM `talk-to-my-data-508110.retail_dw.sales` LIMIT 10", True),
         ("WITH cte AS (SELECT * FROM sales) SELECT * FROM cte", True),
         ("DELETE FROM sales WHERE 1=1", False),
         ("SELECT * FROM sales; DROP TABLE products", False),
