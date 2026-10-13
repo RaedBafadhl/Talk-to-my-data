@@ -63,8 +63,9 @@ python scripts/deployment.py raed verify
 `terraform/foundation/` defines API enablement, service accounts, runtime and
 deployer permissions, optional GitHub federation, state storage, BigQuery
 dataset and table schemas. Data rows are not managed by Terraform. Existing
-table data is protected against destruction; dataset access is managed
-additively without removing team access.
+table data is protected against destruction; runtime reader permissions are
+managed as additive table IAM members. Existing dataset/team access is
+preserved, including legacy dataset-reader entries created before Terraform.
 
 Foundation operations are separate from routine application deployment and
 require a project-owner/platform identity with API, IAM, BigQuery and state
@@ -81,9 +82,7 @@ python scripts/foundation.py raed plan
 python scripts/foundation.py raed apply
 ```
 
-The same commands with `personal` manage the personal foundation. The
-dataset-reader resource does not support import in the pinned provider;
-its first apply reconciles the individual access entry. New environments
+The same commands with `personal` manage the personal foundation. New environments
 still require an owner to establish billing, enable initial APIs, create a
 runtime/deployer identity and bootstrap the remote-state bucket before
 remote Terraform initialization. Import is mandatory for existing resources.

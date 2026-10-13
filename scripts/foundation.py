@@ -87,6 +87,11 @@ class Foundation(Deployment):
                 name = table["tableReference"]["tableId"]
                 if name in {"sales", "products", "customers", "stores", "exchange_rates"}:
                     resources.append((f'google_bigquery_table.retail["{name}"]', f"projects/{project}/datasets/retail_dw/tables/{name}"))
+                    policy = json.loads(self.run(["bq", f"--project_id={project}", "--format=json",
+                                                  "get-iam-policy", f"{project}:retail_dw.{name}"], capture=True))
+                    if has_binding(policy, "roles/bigquery.dataViewer", f"serviceAccount:{runtime}"):
+                        resources.append((f'google_bigquery_table_iam_member.runtime_reader["{name}"]',
+                                          f"projects/{project}/datasets/retail_dw/tables/{name} roles/bigquery.dataViewer serviceAccount:{runtime}"))
         if self.config["auth_mode"] == "federation":
             pool = f"projects/{project}/locations/global/workloadIdentityPools/github"
             self.run(["gcloud", "iam", "workload-identity-pools", "describe", "github",

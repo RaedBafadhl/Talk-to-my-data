@@ -160,10 +160,13 @@ resource "google_bigquery_dataset" "retail" {
   }
 }
 
-resource "google_bigquery_dataset_access" "runtime_reader" {
-  dataset_id    = google_bigquery_dataset.retail.dataset_id
-  role          = "READER"
-  user_by_email = google_service_account.runtime.email
+resource "google_bigquery_table_iam_member" "runtime_reader" {
+  for_each   = google_bigquery_table.retail
+  project    = local.config.project_id
+  dataset_id = google_bigquery_dataset.retail.dataset_id
+  table_id   = each.value.table_id
+  role       = "roles/bigquery.dataViewer"
+  member     = "serviceAccount:${google_service_account.runtime.email}"
 }
 
 resource "google_bigquery_table" "retail" {
