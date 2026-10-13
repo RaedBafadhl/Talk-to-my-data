@@ -27,6 +27,7 @@ resource "google_cloud_run_v2_service" "backend" {
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
+    service_account = var.backend_runtime_service_account
     containers {
       image = "us-docker.pkg.dev/cloudrun/container/hello" # Placeholder image, updated by GitHub Actions
       ports {

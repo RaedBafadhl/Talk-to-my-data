@@ -33,7 +33,7 @@ One row per product.
 | unit_cost | DECIMAL | What it costs the retailer (cost per unit), in USD |
 | unit_price | DECIMAL | What the customer pays (selling price per unit), in USD |
 | category | STRING | e.g. "Audio", "Computers" |
-| subcategory | STRING | e.g. "Headphones", "Laptops" |
+| subcategory | STRING | e.g. "Bluetooth Headphones", "Laptops" |
 
 **Cost and price columns:** the ONLY cost column is `unit_cost` and the ONLY price column is `unit_price`. There is no `cost`, `cost_price`, `product_cost`, `purchase_price` or `price` column -- never use those names.
 
@@ -112,5 +112,6 @@ The LLM should use this table when it sees these words in a user's question:
 | "margin" / "profit margin" | profit divided by revenue, i.e. `SUM(quantity * (unit_price - unit_cost)) / SUM(quantity * unit_price)` |
 | "in euros" / "in pounds" / "in local currency" | USD amount multiplied by `exchange_rates.exchange_rate` (units of local currency per 1 USD); join `exchange_rates` on currency and date. Only needed when a question asks for a local currency |
 | "delivered" / "undelivered" order | there is no status column -- `delivery_date IS NOT NULL` means delivered, `delivery_date IS NULL` means undelivered |
+| "headphones" | in products table, headphones are subcategory `'Bluetooth Headphones'` (or use `LOWER(products.subcategory) LIKE '%headphone%'`) |
 
 **Note:** if a question is genuinely ambiguous (e.g. "sales" could mean revenue or units), the assistant should ask a clarification question rather than guess -- see `api.md`.

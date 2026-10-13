@@ -5,8 +5,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
+# Copy source code and contracts
 COPY src/ /app/src/
+COPY contracts/ /app/contracts/
 
 # Set PYTHONPATH so Python can find the 'backend' and 'llm' packages
 ENV PYTHONPATH=/app/src

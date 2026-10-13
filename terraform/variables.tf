@@ -15,3 +15,15 @@ variable "artifact_repo_name" {
   description = "Name for the Artifact Registry repository"
   default     = "talk-to-my-data-repo"
 }
+
+variable "backend_runtime_service_account" {
+  type        = string
+  description = "Runtime service account for Cloud Run backend"
+  default     = "talk-to-my-data-backend@talk-to-my-data-508110.iam.gserviceaccount.com"
+}
+
+variable "deployer_service_account" {
+  type        = string
+  description = "Deployer service account used for CI/CD"
+  default     = "github-deployer@talk-to-my-data-508110.iam.gserviceaccount.com"
+}

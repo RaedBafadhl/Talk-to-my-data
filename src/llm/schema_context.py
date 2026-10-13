@@ -18,6 +18,8 @@ import re
 from pathlib import Path
 
 SCHEMA_PATH = Path("contracts/schema.md")
+if not SCHEMA_PATH.exists():
+    SCHEMA_PATH = Path(__file__).resolve().parent.parent.parent / "contracts" / "schema.md"
 
 TABLE_NAMES = {"sales", "products", "customers", "stores", "exchange_rates"}
 
@@ -157,7 +159,7 @@ def build_system_prompt(question: str) -> str:
     # against BigQuery and confirmed correct (see scripts/golden_dataset.py
     # history). Using real, proven examples rather than invented ones keeps
     # the prompt honest and means every pattern shown is genuinely reliable.
-    project_id = os.getenv("GCP_PROJECT_ID", "talk-to-my-data-508110")
+    project_id = os.getenv("GCP_PROJECT_ID", "tgs-talk-to-data")
     few_shot_examples = f"""
 EXAMPLES (these are real, verified question-to-SQL patterns -- follow this style):
  
