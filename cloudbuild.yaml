@@ -1,16 +1,16 @@
 steps:
   # 1. Build and push backend
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'europe-west4-docker.pkg.dev/talk-to-my-data-508110/talk-to-my-data-repo/backend:latest', '-f', 'Dockerfile.backend', '.']
+    args: ['build', '-t', 'europe-west4-docker.pkg.dev/tgs-talk-to-data/talk-to-my-data-repo/backend:latest', '-f', 'Dockerfile.backend', '.']
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'europe-west4-docker.pkg.dev/talk-to-my-data-508110/talk-to-my-data-repo/backend:latest']
+    args: ['push', 'europe-west4-docker.pkg.dev/tgs-talk-to-data/talk-to-my-data-repo/backend:latest']
 
   # 2. Build and push frontend
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'europe-west4-docker.pkg.dev/talk-to-my-data-508110/talk-to-my-data-repo/frontend:latest', '-f', 'Dockerfile.frontend', '.']
+    args: ['build', '-t', 'europe-west4-docker.pkg.dev/tgs-talk-to-data/talk-to-my-data-repo/frontend:latest', '-f', 'Dockerfile.frontend', '.']
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'europe-west4-docker.pkg.dev/talk-to-my-data-508110/talk-to-my-data-repo/frontend:latest']
+    args: ['push', 'europe-west4-docker.pkg.dev/tgs-talk-to-data/talk-to-my-data-repo/frontend:latest']
 
 images:
-  - 'europe-west4-docker.pkg.dev/talk-to-my-data-508110/talk-to-my-data-repo/backend:latest'
-  - 'europe-west4-docker.pkg.dev/talk-to-my-data-508110/talk-to-my-data-repo/frontend:latest'
+  - 'europe-west4-docker.pkg.dev/tgs-talk-to-data/talk-to-my-data-repo/backend:latest'
+  - 'europe-west4-docker.pkg.dev/tgs-talk-to-data/talk-to-my-data-repo/frontend:latest'

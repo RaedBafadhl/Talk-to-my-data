@@ -1,7 +1,7 @@
 variable "project_id" {
   type        = string
   description = "Google Cloud Project ID"
-  default     = "talk-to-my-data-508110"
+  default     = "tgs-talk-to-data"
 }
 
 variable "region" {
@@ -19,11 +19,11 @@ variable "artifact_repo_name" {
 variable "backend_runtime_service_account" {
   type        = string
   description = "Runtime service account for Cloud Run backend"
-  default     = "talk-to-my-data-backend@talk-to-my-data-508110.iam.gserviceaccount.com"
+  default     = "talk-to-my-data-backend@tgs-talk-to-data.iam.gserviceaccount.com"
 }
 
 variable "deployer_service_account" {
   type        = string
   description = "Deployer service account used for CI/CD"
-  default     = "github-deployer@talk-to-my-data-508110.iam.gserviceaccount.com"
+  default     = "github-deployer@tgs-talk-to-data.iam.gserviceaccount.com"
 }

@@ -6,11 +6,12 @@ on:
       - main
 
 env:
-  PROJECT_ID: talk-to-my-data-508110
+  PROJECT_ID: tgs-talk-to-data
   REGION: europe-west4
   REPO_NAME: talk-to-my-data-repo
   BACKEND_SERVICE: talk-to-my-data-backend
   FRONTEND_SERVICE: talk-to-my-data-frontend
+  RUNTIME_SERVICE_ACCOUNT: talk-to-my-data-backend@tgs-talk-to-data.iam.gserviceaccount.com
 
 jobs:
   build-and-deploy:
@@ -24,9 +25,12 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+          project_id: '${{ env.PROJECT_ID }}'
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: '${{ env.PROJECT_ID }}'
 
       - name: Ensure Artifact Registry repository exists
         run: |
@@ -56,13 +60,15 @@ jobs:
           IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:${{ github.sha }}
           
           gcloud run deploy ${{ env.BACKEND_SERVICE }} \
+            --project ${{ env.PROJECT_ID }} \
             --image $IMAGE_TAG \
             --region ${{ env.REGION }} \
             --platform managed \
             --port 8080 \
             --min-instances 1 \
-            --service-account talk-to-my-data-backend@talk-to-my-data-508110.iam.gserviceaccount.com \
-            --set-env-vars="VERTEX_AI_PROJECT_ID=${{ env.PROJECT_ID }},BIGQUERY_PROJECT_ID=${{ env.PROJECT_ID }},GCP_PROJECT_ID=${{ env.PROJECT_ID }}" \
+            --max-instances 2 \
+            --service-account ${{ env.RUNTIME_SERVICE_ACCOUNT }} \
+            --set-env-vars="VERTEX_AI_PROJECT_ID=${{ env.PROJECT_ID }},BIGQUERY_PROJECT_ID=${{ env.PROJECT_ID }},GCP_PROJECT_ID=${{ env.PROJECT_ID }},GCP_REGION=${{ env.REGION }}" \
             --allow-unauthenticated
 
       - name: Deploy Frontend to Cloud Run
@@ -70,14 +76,17 @@ jobs:
           IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/frontend:${{ github.sha }}
           
           # Get backend URL
-          BACKEND_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --region ${{ env.REGION }} --format 'value(status.url)')
+          BACKEND_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --project ${{ env.PROJECT_ID }} --region ${{ env.REGION }} --format 'value(status.url)')
           
           gcloud run deploy ${{ env.FRONTEND_SERVICE }} \
+            --project ${{ env.PROJECT_ID }} \
             --image $IMAGE_TAG \
             --region ${{ env.REGION }} \
             --platform managed \
             --port 8501 \
             --session-affinity \
             --min-instances 1 \
+            --max-instances 2 \
+            --service-account ${{ env.RUNTIME_SERVICE_ACCOUNT }} \
             --set-env-vars="BACKEND_API_URL=$BACKEND_URL/ask" \
             --allow-unauthenticated

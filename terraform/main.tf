@@ -28,13 +28,23 @@ resource "google_cloud_run_v2_service" "backend" {
 
   template {
     service_account = var.backend_runtime_service_account
+    scaling {
+      min_instance_count = 1
+      max_instance_count = 2
+    }
     containers {
       image = "us-docker.pkg.dev/cloudrun/container/hello" # Placeholder image, updated by GitHub Actions
       ports {
         container_port = 8080
       }
-      # Real environment variables will be injected by GitHub Actions / Cloud Run deploy step
-      # until we migrate to Secret Manager.
+      env {
+        name  = "GCP_PROJECT_ID"
+        value = var.project_id
+      }
+      env {
+        name  = "GCP_REGION"
+        value = var.region
+      }
     }
   }
 
@@ -51,7 +61,7 @@ resource "google_cloud_run_v2_service" "backend" {
 # Make Backend Public (or restrict to Frontend only, but for this stage we make it public)
 data "google_iam_policy" "noauth_backend" {
   binding {
-    role = "roles/run.invoker"
+    role    = "roles/run.invoker"
     members = ["allUsers"]
   }
 }
@@ -70,6 +80,12 @@ resource "google_cloud_run_v2_service" "frontend" {
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
+    service_account  = var.backend_runtime_service_account
+    session_affinity = true
+    scaling {
+      min_instance_count = 1
+      max_instance_count = 2
+    }
     containers {
       image = "us-docker.pkg.dev/cloudrun/container/hello" # Placeholder image
       ports {
@@ -94,7 +110,7 @@ resource "google_cloud_run_v2_service" "frontend" {
 # Make Frontend Public
 data "google_iam_policy" "noauth_frontend" {
   binding {
-    role = "roles/run.invoker"
+    role    = "roles/run.invoker"
     members = ["allUsers"]
   }
 }
