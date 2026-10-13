@@ -24,6 +24,13 @@ if not SCHEMA_PATH.exists():
 TABLE_NAMES = {"sales", "products", "customers", "stores", "exchange_rates"}
 
 
+def get_project_id() -> str:
+    project_id = os.getenv("GCP_PROJECT_ID")
+    if not project_id:
+        raise ValueError("GCP_PROJECT_ID must be set for the selected deployment environment")
+    return project_id
+
+
 def parse_schema_sections() -> dict:
     """
     Splits schema.md into per-table sections, plus the shared sections
@@ -159,7 +166,7 @@ def build_system_prompt(question: str) -> str:
     # against BigQuery and confirmed correct (see scripts/golden_dataset.py
     # history). Using real, proven examples rather than invented ones keeps
     # the prompt honest and means every pattern shown is genuinely reliable.
-    project_id = os.getenv("GCP_PROJECT_ID", "talk-to-my-data-508110")
+    project_id = get_project_id()
     few_shot_examples = f"""
 EXAMPLES (these are real, verified question-to-SQL patterns -- follow this style):
  

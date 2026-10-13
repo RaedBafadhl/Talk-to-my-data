@@ -1,0 +1,34 @@
+[
+  {
+    "name": "product_key",
+    "type": "INTEGER"
+  },
+  {
+    "name": "product_name",
+    "type": "STRING"
+  },
+  {
+    "name": "brand",
+    "type": "STRING"
+  },
+  {
+    "name": "color",
+    "type": "STRING"
+  },
+  {
+    "name": "unit_cost",
+    "type": "NUMERIC"
+  },
+  {
+    "name": "unit_price",
+    "type": "NUMERIC"
+  },
+  {
+    "name": "category",
+    "type": "STRING"
+  },
+  {
+    "name": "subcategory",
+    "type": "STRING"
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "name": "customer_key",
+    "type": "INTEGER"
+  },
+  {
+    "name": "name",
+    "type": "STRING"
+  },
+  {
+    "name": "gender",
+    "type": "STRING"
+  },
+  {
+    "name": "city",
+    "type": "STRING"
+  },
+  {
+    "name": "state",
+    "type": "STRING"
+  },
+  {
+    "name": "zip_code",
+    "type": "STRING"
+  },
+  {
+    "name": "country",
+    "type": "STRING"
+  },
+  {
+    "name": "continent",
+    "type": "STRING"
+  },
+  {
+    "name": "birthday",
+    "type": "DATE"
+  }
+]

@@ -38,10 +38,14 @@ Thumbs.db
 *.json
 !package.json
 !tsconfig.json
+!terraform/environments/*.tfvars.json
+!terraform/schemas/*.json
 logs/
 
 # Terraform
 .terraform/
+.terraform-data/
 *.tfstate
 *.tfstate.*
-.terraform.lock.hcl
+*.tfplan
+gha-creds-*.json

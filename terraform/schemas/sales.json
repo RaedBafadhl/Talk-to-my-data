@@ -1,0 +1,38 @@
+[
+  {
+    "name": "order_date",
+    "type": "DATE"
+  },
+  {
+    "name": "order_number",
+    "type": "STRING"
+  },
+  {
+    "name": "line_item",
+    "type": "INTEGER"
+  },
+  {
+    "name": "product_key",
+    "type": "INTEGER"
+  },
+  {
+    "name": "quantity",
+    "type": "INTEGER"
+  },
+  {
+    "name": "customer_key",
+    "type": "INTEGER"
+  },
+  {
+    "name": "store_key",
+    "type": "INTEGER"
+  },
+  {
+    "name": "currency_code",
+    "type": "STRING"
+  },
+  {
+    "name": "delivery_date",
+    "type": "DATE"
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "name": "date",
+    "type": "DATE"
+  },
+  {
+    "name": "currency",
+    "type": "STRING"
+  },
+  {
+    "name": "exchange_rate",
+    "type": "NUMERIC"
+  }
+]

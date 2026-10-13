@@ -2,91 +2,95 @@ name: Deploy to Google Cloud Run
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      target:
+        description: GCP environment
+        type: choice
+        options: [raed, personal]
+        default: raed
+        required: true
 
 permissions:
   contents: read
   id-token: write
 
-env:
-  PROJECT_ID: talk-to-my-data-508110
-  REGION: europe-west4
-  REPO_NAME: talk-to-my-data-repo
-  BACKEND_SERVICE: talk-to-my-data-backend
-  FRONTEND_SERVICE: talk-to-my-data-frontend
-  RUNTIME_SERVICE_ACCOUNT: talk-to-my-data-backend@talk-to-my-data-508110.iam.gserviceaccount.com
+concurrency:
+  group: deployment-${{ github.event.inputs.target || 'raed' }}
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_ENVIRONMENT: ${{ github.event.inputs.target || 'raed' }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
-        id: auth
+      - name: Load environment
+        id: config
+        run: python scripts/deployment.py "$TARGET_ENVIRONMENT" configure
+
+      - name: Authenticate to Raed project
+        if: steps.config.outputs.auth_mode == 'credentials'
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: projects/290271728971/locations/global/workloadIdentityPools/github/providers/talk-to-my-data
-          service_account: github-deployer@talk-to-my-data-508110.iam.gserviceaccount.com
-          project_id: '${{ env.PROJECT_ID }}'
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+          project_id: '${{ steps.config.outputs.project_id }}'
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+      - name: Authenticate with federation
+        if: steps.config.outputs.auth_mode == 'federation'
+        uses: google-github-actions/auth@v2
         with:
-          project_id: '${{ env.PROJECT_ID }}'
+          workload_identity_provider: '${{ steps.config.outputs.workload_identity_provider }}'
+          service_account: '${{ steps.config.outputs.deployer_service_account }}'
+          project_id: '${{ steps.config.outputs.project_id }}'
 
-      - name: Check Artifact Registry repository
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: '${{ steps.config.outputs.project_id }}'
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.3
+          terraform_wrapper: false
+
+      - name: Verify deployment identity
+        env:
+          EXPECTED_ACCOUNT: ${{ steps.config.outputs.deployer_service_account }}
         run: |
-          gcloud artifacts repositories describe ${{ env.REPO_NAME }} --project=${{ env.PROJECT_ID }} --location=${{ env.REGION }}
+          ACCOUNT=$(gcloud auth list --filter=status:ACTIVE --format='value(account)')
+          test "$ACCOUNT" = "$EXPECTED_ACCOUNT"
 
-      - name: Configure Docker to use Artifact Registry
-        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+      - name: Initialize isolated Terraform state
+        run: python scripts/deployment.py "$TARGET_ENVIRONMENT" init
 
-      - name: Build and Push Backend Image
+      - name: Import existing application resources
+        run: python scripts/deployment.py "$TARGET_ENVIRONMENT" adopt
+
+      - name: Bootstrap Artifact Registry if needed
+        run: python scripts/deployment.py "$TARGET_ENVIRONMENT" registry
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker '${{ steps.config.outputs.region }}-docker.pkg.dev' --quiet
+
+      - name: Build and push images
+        env:
+          BACKEND_IMAGE: ${{ steps.config.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ steps.config.outputs.frontend_image }}
         run: |
-          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:${{ github.sha }}
-          docker build -t $IMAGE_TAG -f Dockerfile.backend .
-          docker push $IMAGE_TAG
+          docker build -t "$BACKEND_IMAGE" -f Dockerfile.backend .
+          docker push "$BACKEND_IMAGE"
+          docker build -t "$FRONTEND_IMAGE" -f Dockerfile.frontend .
+          docker push "$FRONTEND_IMAGE"
 
-      - name: Build and Push Frontend Image
-        run: |
-          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/frontend:${{ github.sha }}
-          docker build -t $IMAGE_TAG -f Dockerfile.frontend .
-          docker push $IMAGE_TAG
+      - name: Plan infrastructure and application deployment
+        run: python scripts/deployment.py "$TARGET_ENVIRONMENT" plan
 
-      - name: Deploy Backend to Cloud Run
-        run: |
-          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/backend:${{ github.sha }}
-          
-          gcloud run deploy ${{ env.BACKEND_SERVICE }} \
-            --project ${{ env.PROJECT_ID }} \
-            --image $IMAGE_TAG \
-            --region ${{ env.REGION }} \
-            --platform managed \
-            --port 8080 \
-            --min-instances 1 \
-            --max-instances 2 \
-            --service-account ${{ env.RUNTIME_SERVICE_ACCOUNT }} \
-            --set-env-vars="VERTEX_AI_PROJECT_ID=${{ env.PROJECT_ID }},BIGQUERY_PROJECT_ID=${{ env.PROJECT_ID }},GCP_PROJECT_ID=${{ env.PROJECT_ID }},GCP_REGION=${{ env.REGION }}"
+      - name: Apply verified plan
+        run: python scripts/deployment.py "$TARGET_ENVIRONMENT" apply
 
-      - name: Deploy Frontend to Cloud Run
-        run: |
-          IMAGE_TAG=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/frontend:${{ github.sha }}
-          
-          # Get backend URL
-          BACKEND_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --project ${{ env.PROJECT_ID }} --region ${{ env.REGION }} --format 'value(status.url)')
-          
-          gcloud run deploy ${{ env.FRONTEND_SERVICE }} \
-            --project ${{ env.PROJECT_ID }} \
-            --image $IMAGE_TAG \
-            --region ${{ env.REGION }} \
-            --platform managed \
-            --port 8501 \
-            --session-affinity \
-            --min-instances 1 \
-            --max-instances 2 \
-            --service-account ${{ env.RUNTIME_SERVICE_ACCOUNT }} \
-            --set-env-vars="BACKEND_API_URL=$BACKEND_URL/ask"
+      - name: Check health and live BigQuery access
+        run: python scripts/deployment.py "$TARGET_ENVIRONMENT" verify

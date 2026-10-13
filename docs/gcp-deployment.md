@@ -1,34 +1,101 @@
 # GCP deployment
 
-The application runs in `talk-to-my-data-508110`, owned by
-`muhammeddulger01@gmail.com`, in `europe-west4`.
+Pushes to `main` deploy to **raed**, project `tgs-talk-to-data` in
+`europe-west4`. GitHub Actions also supports a manual `target` selection:
+`raed` or `personal`. Each environment has its own configuration, local
+Terraform working directory, remote state bucket and deployment concurrency
+group. The existing personal services are retained.
 
-- Backend: `talk-to-my-data-backend`, port 8080.
-- Frontend: `talk-to-my-data-frontend`, port 8501.
-- Both services use minimum 1 and maximum 2 instances.
-- Runtime account: `talk-to-my-data-backend@talk-to-my-data-508110.iam.gserviceaccount.com`.
-- BigQuery dataset: `talk-to-my-data-508110.retail_dw`.
-- Artifact Registry: `europe-west4-docker.pkg.dev/talk-to-my-data-508110/talk-to-my-data-repo`.
+## Configuration and authentication
 
-GitHub Actions deploys pushes to `main` using Workload Identity Federation,
-with no JSON service account key or `GCP_CREDENTIALS` secret required.
-The provider is restricted to repository ID `1351354609`, owner ID `259883354`,
-and `refs/heads/main`.
+The single source of environment settings is
+`terraform/environments/<environment>.tfvars.json`. Application SQL reads
+`GCP_PROJECT_ID`; it has no hardcoded fallback to another project.
 
-The deployer account is `github-deployer@talk-to-my-data-508110.iam.gserviceaccount.com`.
-It has Cloud Run Developer on the two application services, Artifact Registry
-Writer on the application repository, Service Account User on the runtime
-account, and Service Usage Consumer on the project. Initial creation of the
-repository, services, and their public invoker policies is performed by the
-project owner; the workflow updates existing resources.
+- `raed`: `GCP_CREDENTIALS` must contain credentials for
+  `github-deployer@tgs-talk-to-data.iam.gserviceaccount.com`.
+- `personal`: uses the existing GitHub Workload Identity Federation provider.
+- Both environments use backend port 8080, frontend port 8501, minimum 1 and
+  maximum 2 instances. Frontend connects to its environment's backend `/ask`.
 
-The runtime account has BigQuery Job User and Vertex AI User on the project,
-and reader access on the `retail_dw` dataset. Frontend `BACKEND_API_URL` is set
-from the deployed backend URL with `/ask` appended.
+Raed's state is temporarily hosted in the personal project, as agreed:
+`gs://talk-to-my-data-508110-tfstate-raed`. Personal state uses
+`gs://talk-to-my-data-508110-tfstate-personal`. Both buckets have versioning,
+uniform access and public access prevention. Each deployer has Storage Object
+Admin only on its own environment's bucket. State prefixes are
+`application/<environment>` and `foundation/<environment>`.
 
-Cloud Build configuration uses `$PROJECT_ID` for image paths. Submit builds
-with an explicit `--project=talk-to-my-data-508110`.
+## Application deployment
 
-Existing Terraform resources created outside Terraform must be imported into
-the correct state before applying Terraform. Do not apply old state against a
-different GCP project.
+`terraform/` manages Artifact Registry, Cloud Run services, public invoker
+memberships, image versions, environment variables and scaling. It adds IAM
+members without replacing existing policies. Existing resources are imported
+before planning. Registry-only targeting is used solely to create a missing
+repository before the first image build; every deployment subsequently plans
+and applies the entire application stack.
+
+The pipeline refuses resource deletion or replacement, applies the saved
+plan and checks both health endpoints plus a live BigQuery-backed question.
+Deployment identities need registry permissions, Cloud Run permissions,
+permission to act as the runtime account and access to their state bucket.
+Raed's existing Cloud Run Admin allows initial service creation and public
+invoker configuration. Personal uses its previously created services and
+resource-scoped permissions.
+
+Local commands, with credentials for the selected project:
+
+```sh
+python scripts/deployment.py raed init
+python scripts/deployment.py raed adopt --image-tag COMMIT_SHA
+python scripts/deployment.py raed registry --image-tag COMMIT_SHA
+# Build and push both images for COMMIT_SHA before planning service updates.
+python scripts/deployment.py raed plan --image-tag COMMIT_SHA
+python scripts/deployment.py raed apply --image-tag COMMIT_SHA
+python scripts/deployment.py raed verify
+```
+
+## Foundation management
+
+`terraform/foundation/` defines API enablement, service accounts, runtime and
+deployer permissions, optional GitHub federation, state storage, BigQuery
+dataset and table schemas. Data rows are not managed by Terraform. Existing
+table data is protected against destruction; dataset access is managed
+additively without removing team access.
+
+Foundation operations are separate from routine application deployment and
+require a project-owner/platform identity with API, IAM, BigQuery and state
+bucket management permissions. The application deployer is not given these
+extra privileges. Raed's foundation cannot be adopted by the local user with
+the currently granted application-only roles. The source is ready for the
+project owner to adopt after the initial application deployment:
+
+```sh
+python scripts/foundation.py raed init
+python scripts/foundation.py raed adopt
+python scripts/foundation.py raed plan
+# Review the saved plan before applying it.
+python scripts/foundation.py raed apply
+```
+
+The same commands with `personal` manage the personal foundation. The
+dataset-reader resource does not support import in the pinned provider;
+its first apply reconciles the individual access entry. New environments
+still require an owner to establish billing, enable initial APIs, create a
+runtime/deployer identity and bootstrap the remote-state bucket before
+remote Terraform initialization. Import is mandatory for existing resources.
+
+To move Raed's state into his project later, pause deployments, create a
+versioned bucket there, grant the deployer bucket-scoped Object Admin, update
+`state_bucket` and `state_project_id`, then run `terraform init -migrate-state`
+for both stacks using their respective existing Terraform data directories.
+Do not use `-reconfigure` to migrate state; the normal deployment `init`
+command deliberately only reconnects to the configured backend.
+
+SQL helper templates are environment-independent:
+
+```sh
+python scripts/bigquery/run_sql.py raed scripts/eda_queries.sql --dry-run
+```
+
+Cloud Build image paths use `$PROJECT_ID`. Select the project explicitly if
+using Cloud Build separately from GitHub Actions.

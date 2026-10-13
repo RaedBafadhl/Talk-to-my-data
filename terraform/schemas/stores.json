@@ -1,0 +1,22 @@
+[
+  {
+    "name": "store_key",
+    "type": "INTEGER"
+  },
+  {
+    "name": "country",
+    "type": "STRING"
+  },
+  {
+    "name": "state",
+    "type": "STRING"
+  },
+  {
+    "name": "square_meters",
+    "type": "INTEGER"
+  },
+  {
+    "name": "open_date",
+    "type": "DATE"
+  }
+]

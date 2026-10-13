@@ -17,6 +17,7 @@ if src_dir not in sys.path:
 from llm.generate_sql import generate_sql
 from llm.self_healing import execute_with_self_healing, check_clarification
 from llm.security import validate_sql
+from llm.schema_context import get_project_id
 from backend.response_formatter import format_response
 
 
@@ -42,7 +43,7 @@ def generate_smart_fallback_sql(question: str) -> str:
     Generates distinct, accurate BigQuery SQL queries based on intent and schema entities.
     """
     q = question.lower().strip()
-    project_id = os.getenv("GCP_PROJECT_ID", "talk-to-my-data-508110")
+    project_id = get_project_id()
 
     # 1. Store queries
     if "store" in q:

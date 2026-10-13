@@ -16,7 +16,7 @@ from schema_context import build_system_prompt
 
 load_dotenv()
 
-PROJECT_ID = os.getenv("GCP_PROJECT_ID", "talk-to-my-data-508110")
+PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 REGION = os.getenv("GCP_REGION", "europe-west4")
 MODEL_NAME = "gemini-2.5-flash"
 
