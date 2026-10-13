@@ -68,11 +68,10 @@ countries = q(f"SELECT DISTINCT country FROM `{PROJECT_ID}.{DATASET}.stores` ORD
 print(f"  Markets ({len(countries)}): {', '.join(c['country'] for c in countries)}")
  
 revenue_by_country = q(f"""
-    SELECT c.country, ROUND(SUM(s.quantity * p.unit_price * e.exchange_rate), 2) as revenue
+    SELECT c.country, ROUND(SUM(s.quantity * p.unit_price), 2) as revenue
     FROM `{PROJECT_ID}.{DATASET}.sales` s
     JOIN `{PROJECT_ID}.{DATASET}.customers` c ON s.customer_key = c.customer_key
     JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-    JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
     GROUP BY c.country ORDER BY revenue DESC
 """)
 print("\n  Revenue by customer country:")
@@ -87,10 +86,9 @@ section("3. REVENUE OVER TIME")
  
 by_year = q(f"""
     SELECT EXTRACT(YEAR FROM s.order_date) as year,
-           ROUND(SUM(s.quantity * p.unit_price * e.exchange_rate), 2) as revenue
+           ROUND(SUM(s.quantity * p.unit_price), 2) as revenue
     FROM `{PROJECT_ID}.{DATASET}.sales` s
     JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-    JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
     GROUP BY year ORDER BY year
 """)
 print("  By year:")
@@ -99,10 +97,9 @@ for r in by_year:
  
 by_month = q(f"""
     SELECT EXTRACT(MONTH FROM s.order_date) as month,
-           ROUND(SUM(s.quantity * p.unit_price * e.exchange_rate), 2) as revenue
+           ROUND(SUM(s.quantity * p.unit_price), 2) as revenue
     FROM `{PROJECT_ID}.{DATASET}.sales` s
     JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-    JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
     GROUP BY month ORDER BY month
 """)
 print("\n  By calendar month (seasonality, all years combined):")
@@ -139,10 +136,9 @@ plt.close()
 section("4. PRODUCT ANALYSIS")
  
 top_categories = q(f"""
-    SELECT p.category, ROUND(SUM(s.quantity * p.unit_price * e.exchange_rate), 2) as revenue
+    SELECT p.category, ROUND(SUM(s.quantity * p.unit_price), 2) as revenue
     FROM `{PROJECT_ID}.{DATASET}.sales` s
     JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-    JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
     GROUP BY p.category ORDER BY revenue DESC LIMIT 5
 """)
 print("  Top 5 categories by revenue:")
@@ -150,10 +146,9 @@ for r in top_categories:
     print(f"    {r['category']:25} EUR {r['revenue']:>15,.2f}")
  
 top_brands = q(f"""
-    SELECT p.brand, ROUND(SUM(s.quantity * p.unit_price * e.exchange_rate), 2) as revenue
+    SELECT p.brand, ROUND(SUM(s.quantity * p.unit_price), 2) as revenue
     FROM `{PROJECT_ID}.{DATASET}.sales` s
     JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-    JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
     GROUP BY p.brand ORDER BY revenue DESC LIMIT 5
 """)
 print("\n  Top 5 brands by revenue:")
@@ -207,10 +202,9 @@ section("6. ORDER VALUE DISTRIBUTION")
  
 order_dist = q(f"""
     WITH order_totals AS (
-        SELECT s.order_number, SUM(s.quantity * p.unit_price * e.exchange_rate) AS order_value
+        SELECT s.order_number, SUM(s.quantity * p.unit_price) AS order_value
         FROM `{PROJECT_ID}.{DATASET}.sales` s
         JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-        JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
         GROUP BY s.order_number
     )
     SELECT
@@ -229,10 +223,9 @@ for r in order_dist:
     print(f"    {r['value_range']:15} {r['n']:>6,} orders")
  
 aov = q(f"""
-    SELECT ROUND(SUM(s.quantity * p.unit_price * e.exchange_rate) / COUNT(DISTINCT s.order_number), 2) as aov
+    SELECT ROUND(SUM(s.quantity * p.unit_price) / COUNT(DISTINCT s.order_number), 2) as aov
     FROM `{PROJECT_ID}.{DATASET}.sales` s
     JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-    JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
 """)[0]
 print(f"\n  Average Order Value (AOV): EUR {aov['aov']}")
  
@@ -287,11 +280,10 @@ section("9. SALES CHANNEL: ONLINE VS PHYSICAL")
 channel_split = q(f"""
     SELECT
         CASE WHEN s.store_key = 0 THEN 'Online' ELSE 'Physical store' END as channel,
-        ROUND(SUM(s.quantity * p.unit_price * e.exchange_rate), 2) as revenue,
+        ROUND(SUM(s.quantity * p.unit_price), 2) as revenue,
         COUNT(DISTINCT s.order_number) as orders
     FROM `{PROJECT_ID}.{DATASET}.sales` s
     JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-    JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
     GROUP BY channel
 """)
 for r in channel_split:
@@ -304,10 +296,9 @@ for r in channel_split:
 section("10. TOP 10 INDIVIDUAL PRODUCTS BY REVENUE")
  
 top_products = q(f"""
-    SELECT p.product_name, p.brand, ROUND(SUM(s.quantity * p.unit_price * e.exchange_rate), 2) as revenue
+    SELECT p.product_name, p.brand, ROUND(SUM(s.quantity * p.unit_price), 2) as revenue
     FROM `{PROJECT_ID}.{DATASET}.sales` s
     JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-    JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
     GROUP BY p.product_name, p.brand ORDER BY revenue DESC LIMIT 10
 """)
 for i, r in enumerate(top_products, 1):
@@ -358,11 +349,10 @@ plt.close()
 section("12. REVENUE BY CONTINENT")
  
 by_continent = q(f"""
-    SELECT c.continent, ROUND(SUM(s.quantity * p.unit_price * e.exchange_rate), 2) as revenue
+    SELECT c.continent, ROUND(SUM(s.quantity * p.unit_price), 2) as revenue
     FROM `{PROJECT_ID}.{DATASET}.sales` s
     JOIN `{PROJECT_ID}.{DATASET}.customers` c ON s.customer_key = c.customer_key
     JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-    JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
     GROUP BY c.continent ORDER BY revenue DESC
 """)
 for r in by_continent:
@@ -425,11 +415,10 @@ age_spending = q(f"""
             WHEN DATE_DIFF(CURRENT_DATE(), c.birthday, YEAR) < 60 THEN '3. 45-60'
             ELSE '4. 60+'
         END as age_band,
-        ROUND(SUM(s.quantity * p.unit_price * e.exchange_rate), 2) as revenue
+        ROUND(SUM(s.quantity * p.unit_price), 2) as revenue
     FROM `{PROJECT_ID}.{DATASET}.sales` s
     JOIN `{PROJECT_ID}.{DATASET}.customers` c ON s.customer_key = c.customer_key
     JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-    JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
     GROUP BY age_band ORDER BY age_band
 """)
 print("\n  Customer age band vs revenue:")
@@ -439,10 +428,9 @@ for r in age_spending:
 channel_aov = q(f"""
     SELECT
         CASE WHEN s.store_key = 0 THEN 'Online' ELSE 'Physical' END as channel,
-        ROUND(SUM(s.quantity * p.unit_price * e.exchange_rate) / COUNT(DISTINCT s.order_number), 2) as aov
+        ROUND(SUM(s.quantity * p.unit_price) / COUNT(DISTINCT s.order_number), 2) as aov
     FROM `{PROJECT_ID}.{DATASET}.sales` s
     JOIN `{PROJECT_ID}.{DATASET}.products` p ON s.product_key = p.product_key
-    JOIN `{PROJECT_ID}.{DATASET}.exchange_rates` e ON s.currency_code = e.currency AND s.order_date = e.date
     GROUP BY channel
 """)
 print("\n  Average Order Value, online vs physical:")

@@ -12,7 +12,7 @@ if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
 from backend.main import app
-from backend.security import validate_sql
+from llm.security import validate_sql
 from backend.kpi import compute_kpis
 from backend.formatter import format_response, detect_chart_config
 
@@ -32,7 +32,9 @@ class TestPillar3Backend(unittest.TestCase):
         self.assertEqual(response.json()["status"], "ok")
 
     def test_sql_security_valid(self):
-        safe, msg = validate_sql("SELECT product_name, SUM(quantity) FROM sales GROUP BY product_name")
+        safe, msg = validate_sql(
+            "SELECT product_name, SUM(quantity) FROM sales GROUP BY product_name"
+        )
         self.assertTrue(safe)
         self.assertEqual(msg, "")
 
@@ -49,7 +51,7 @@ class TestPillar3Backend(unittest.TestCase):
     def test_kpi_computation(self):
         data = [
             {"category": "Audio", "sales": 100.0, "quantity": 2, "order_number": "O1"},
-            {"category": "Audio", "sales": 200.0, "quantity": 4, "order_number": "O2"}
+            {"category": "Audio", "sales": 200.0, "quantity": 4, "order_number": "O2"},
         ]
         kpis = compute_kpis(data)
         self.assertEqual(kpis["total_revenue"], 300.0)
@@ -60,7 +62,7 @@ class TestPillar3Backend(unittest.TestCase):
     def test_chart_detection_line(self):
         data = [
             {"order_date": "2025-01-01", "revenue": 5000},
-            {"order_date": "2025-02-01", "revenue": 6200}
+            {"order_date": "2025-02-01", "revenue": 6200},
         ]
         chart = detect_chart_config(data)
         self.assertIsNotNone(chart)
@@ -76,7 +78,7 @@ class TestPillar3Backend(unittest.TestCase):
             {"category": "TVs", "sales": 8900},
             {"category": "Cell Phones", "sales": 15000},
             {"category": "Games", "sales": 7200},
-            {"category": "Home Appliances", "sales": 4100}
+            {"category": "Home Appliances", "sales": 4100},
         ]
         chart = detect_chart_config(data)
         self.assertIsNotNone(chart)
