@@ -1,6 +1,7 @@
 """Deploy either GCP environment using isolated, locked Terraform state."""
 
 import argparse
+import base64
 import json
 import os
 from pathlib import Path
@@ -33,6 +34,22 @@ def reject_deletions(plan):
         raise RuntimeError("Deployment refuses deletion/replacement: " + ", ".join(deleted))
 
 
+def validate_credentials(raw, expected_account):
+    try:
+        credentials = json.loads(raw)
+    except ValueError:
+        try:
+            credentials = json.loads(base64.b64decode(raw, validate=True))
+        except (ValueError, UnicodeDecodeError):
+            raise ValueError("GCP_CREDENTIALS must contain the service account JSON key, not a file path or account email") from None
+    if not isinstance(credentials, dict) or credentials.get("type") != "service_account":
+        raise ValueError("GCP_CREDENTIALS is not a service account key")
+    if credentials.get("client_email") != expected_account:
+        raise ValueError(f"GCP_CREDENTIALS must belong to {expected_account}")
+    if not credentials.get("private_key", "").startswith("-----BEGIN PRIVATE KEY-----"):
+        raise ValueError("GCP_CREDENTIALS has no valid private_key field")
+
+
 class Deployment:
     def __init__(self, name, image_tag):
         self.name = name
@@ -50,9 +67,18 @@ class Deployment:
         self.plan_file = TERRAFORM / f"{name}.tfplan"
 
     def run(self, args, capture=False):
-        result = subprocess.run(args, cwd=ROOT, env=self.env, check=True,
-                                text=True, capture_output=capture)
+        try:
+            result = subprocess.run(args, cwd=ROOT, env=self.env, check=True,
+                                    text=True, capture_output=capture)
+        except subprocess.CalledProcessError as error:
+            if capture and error.stderr:
+                print(error.stderr, file=sys.stderr)
+            raise
         return result.stdout if capture else ""
+
+    def validate_credentials(self):
+        validate_credentials(os.getenv("GCP_CREDENTIALS", ""), self.config["deployer_service_account"])
+        print("Deployment credential format and account verified")
 
     def tf(self, *args, capture=False, variables=False):
         command = ["terraform", f"-chdir={TERRAFORM}", *args]
@@ -140,7 +166,7 @@ class Deployment:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("environment", choices=ENVIRONMENTS)
-    parser.add_argument("command", choices=("configure", "init", "adopt", "registry", "plan", "apply", "verify"))
+    parser.add_argument("command", choices=("configure", "validate-credentials", "init", "adopt", "registry", "plan", "apply", "verify"))
     parser.add_argument("--image-tag", default=os.getenv("GITHUB_SHA", "latest"))
     args = parser.parse_args()
     deployment = Deployment(args.environment, args.image_tag)
@@ -154,7 +180,7 @@ def main():
         else:
             print(json.dumps(values, indent=2))
     else:
-        getattr(deployment, args.command)()
+        getattr(deployment, args.command.replace("-", "_"))()
 
 
 if __name__ == "__main__":

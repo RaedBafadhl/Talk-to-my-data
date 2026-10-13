@@ -69,6 +69,7 @@ resource "google_service_account" "runtime" {
   depends_on   = [google_project_service.api]
   lifecycle {
     prevent_destroy = true
+    ignore_changes  = [description]
   }
 }
 

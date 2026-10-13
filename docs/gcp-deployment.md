@@ -14,6 +14,10 @@ The single source of environment settings is
 
 - `raed`: `GCP_CREDENTIALS` must contain credentials for
   `github-deployer@tgs-talk-to-data.iam.gserviceaccount.com`.
+  Store the full JSON key content (or its base64 encoding), not the file path
+  or service account email. The workflow validates its format and expected
+  account without printing the credential. Secret changes require rerunning
+  the failed workflow; pushing code alone does not repair a malformed key.
 - `personal`: uses the existing GitHub Workload Identity Federation provider.
 - Both environments use backend port 8080, frontend port 8501, minimum 1 and
   maximum 2 instances. Frontend connects to its environment's backend `/ask`.

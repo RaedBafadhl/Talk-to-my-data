@@ -33,6 +33,12 @@ jobs:
         id: config
         run: python scripts/deployment.py "$TARGET_ENVIRONMENT" configure
 
+      - name: Validate Raed deployment credentials
+        if: steps.config.outputs.auth_mode == 'credentials'
+        env:
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+        run: python scripts/deployment.py "$TARGET_ENVIRONMENT" validate-credentials
+
       - name: Authenticate to Raed project
         if: steps.config.outputs.auth_mode == 'credentials'
         uses: google-github-actions/auth@v2
