@@ -57,6 +57,12 @@ class Foundation(Deployment):
         if has_binding(policy, "roles/storage.objectAdmin", member):
             resources.append(("google_storage_bucket_iam_member.state_writer", f"{bucket} roles/storage.objectAdmin {member}"))
         policy = json.loads(self.run(["gcloud", "projects", "get-iam-policy", project, "--format=json"], capture=True))
+        roles = json.loads(self.run(["gcloud", "iam", "roles", "list", f"--project={project}", "--format=json"], capture=True))
+        operation_role = f"projects/{project}/roles/cloudRunOperationReader"
+        if any(item["name"] == operation_role for item in roles):
+            resources.append(("google_project_iam_custom_role.operations_reader", operation_role))
+        if has_binding(policy, operation_role, member):
+            resources.append(("google_project_iam_member.operations_reader", f"{project} {operation_role} {member}"))
         for role in ("roles/bigquery.jobUser", "roles/aiplatform.user"):
             if has_binding(policy, role, f"serviceAccount:{runtime}"):
                 resources.append((f'google_project_iam_member.runtime["{role}"]', f"{project} {role} serviceAccount:{runtime}"))

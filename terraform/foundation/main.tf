@@ -95,6 +95,20 @@ resource "google_project_iam_member" "deployer_api" {
   member  = "serviceAccount:${google_service_account.deployer.email}"
 }
 
+resource "google_project_iam_custom_role" "operations_reader" {
+  project     = local.config.project_id
+  role_id     = "cloudRunOperationReader"
+  title       = "Cloud Run operation reader"
+  description = "Allows Terraform to wait for application deployment operations."
+  permissions = ["run.operations.get"]
+}
+
+resource "google_project_iam_member" "operations_reader" {
+  project = local.config.project_id
+  role    = google_project_iam_custom_role.operations_reader.name
+  member  = "serviceAccount:${google_service_account.deployer.email}"
+}
+
 resource "google_service_account_iam_member" "act_as" {
   service_account_id = google_service_account.runtime.name
   role               = "roles/iam.serviceAccountUser"

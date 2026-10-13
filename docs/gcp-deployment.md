@@ -43,6 +43,10 @@ The pipeline refuses resource deletion or replacement, applies the saved
 plan and checks both health endpoints plus a live BigQuery-backed question.
 Deployment identities need registry permissions, Cloud Run permissions,
 permission to act as the runtime account and access to their state bucket.
+Terraform additionally needs project-level `run.operations.get` to wait for
+deployment operations. The foundation grants only that permission through
+the custom `cloudRunOperationReader` role; service update permissions remain
+scoped to the application services in the personal environment.
 Raed's existing Cloud Run Admin allows initial service creation and public
 invoker configuration. Personal uses its previously created services and
 resource-scoped permissions.
