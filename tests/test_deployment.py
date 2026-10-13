@@ -1,5 +1,6 @@
 import base64
 import json
+import subprocess
 
 import pytest
 
@@ -63,3 +64,25 @@ def test_credentials_from_another_project_are_rejected():
     value = json.dumps({"type": "service_account", "client_email": "other@example.com"})
     with pytest.raises(ValueError, match="must belong"):
         validate_credentials(value, "deployer@example.com")
+
+
+def test_managed_environment_does_not_require_project_listing_permissions(monkeypatch):
+    deployment = Deployment("personal", "commit")
+    addresses = ["google_artifact_registry_repository.docker_repo"]
+    for component in ("backend", "frontend"):
+        addresses.extend([f"google_cloud_run_v2_service.{component}",
+                          f'google_cloud_run_v2_service_iam_member.public["{component}"]'])
+    monkeypatch.setattr(deployment, "tf", lambda *args, **kwargs: "\n".join(addresses))
+    def unexpected_cloud_call(*args, **kwargs):
+        pytest.fail("Managed resources should be refreshed by Terraform, not discovered with gcloud")
+    monkeypatch.setattr(deployment, "run", unexpected_cloud_call)
+    deployment.adopt()
+
+
+def test_permission_denied_is_not_treated_as_a_missing_resource(monkeypatch):
+    deployment = Deployment("personal", "commit")
+    def denied(*args, **kwargs):
+        raise subprocess.CalledProcessError(1, args, stderr="PERMISSION_DENIED")
+    monkeypatch.setattr(deployment, "run", denied)
+    with pytest.raises(subprocess.CalledProcessError):
+        deployment.describe_if_exists(["gcloud", "describe"])

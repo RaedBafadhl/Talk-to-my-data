@@ -95,34 +95,49 @@ class Deployment:
     def adopt(self):
         existing = set(self.tf("state", "list", capture=True).splitlines())
         project, region = self.config["project_id"], self.config["region"]
-        repositories = json.loads(self.run([
-            "gcloud", "artifacts", "repositories", "list", f"--project={project}",
-            f"--location={region}", "--format=json"], capture=True))
         registry_id = f'projects/{project}/locations/{region}/repositories/{self.config["artifact_repo_name"]}'
         resources = []
-        if any(item["name"] == registry_id for item in repositories):
-            resources.append(("google_artifact_registry_repository.docker_repo", registry_id))
-        services = json.loads(self.run([
-            "gcloud", "run", "services", "list", f"--project={project}",
-            f"--region={region}", "--format=json"], capture=True))
-        names = {item["metadata"]["name"] for item in services}
+        registry_address = "google_artifact_registry_repository.docker_repo"
+        if registry_address not in existing:
+            repository = self.describe_if_exists([
+                "gcloud", "artifacts", "repositories", "describe", self.config["artifact_repo_name"],
+                f"--project={project}", f"--location={region}", "--format=json"])
+            if repository:
+                resources.append((registry_address, registry_id))
         for component in ("backend", "frontend"):
             service = f"talk-to-my-data-{component}"
-            if service not in names:
-                continue
+            service_address = f"google_cloud_run_v2_service.{component}"
+            public_address = f'google_cloud_run_v2_service_iam_member.public["{component}"]'
             resource_id = f"projects/{project}/locations/{region}/services/{service}"
-            resources.append((f"google_cloud_run_v2_service.{component}", resource_id))
+            if service_address not in existing:
+                resource = self.describe_if_exists([
+                    "gcloud", "run", "services", "describe", service,
+                    f"--project={project}", f"--region={region}", "--format=json"])
+                if not resource:
+                    continue
+                resources.append((service_address, resource_id))
+            if public_address in existing:
+                continue
             policy = json.loads(self.run([
                 "gcloud", "run", "services", "get-iam-policy", service,
                 f"--project={project}", f"--region={region}", "--format=json"], capture=True))
             if any(binding["role"] == "roles/run.invoker" and "allUsers" in binding["members"]
                    and not binding.get("condition") for binding in policy.get("bindings", [])):
-                resources.append((f'google_cloud_run_v2_service_iam_member.public["{component}"]',
+                resources.append((public_address,
                                   f"{resource_id} roles/run.invoker allUsers"))
         for address, resource_id in resources:
             if address not in existing:
                 self.tf("import", "-input=false", f"-var-file={self.var_file}",
                         address, resource_id)
+
+    def describe_if_exists(self, command):
+        try:
+            return json.loads(self.run(command, capture=True))
+        except subprocess.CalledProcessError as error:
+            message = error.stderr or ""
+            if "NOT_FOUND" in message or "Cannot find service" in message:
+                return None
+            raise
 
     def plan(self, registry_only=False):
         args = ["plan", "-input=false", "-lock-timeout=120s", f"-out={self.plan_file}"]
