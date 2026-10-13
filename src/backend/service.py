@@ -42,7 +42,7 @@ def generate_smart_fallback_sql(question: str) -> str:
     Generates distinct, accurate BigQuery SQL queries based on intent and schema entities.
     """
     q = question.lower().strip()
-    project_id = os.getenv("GCP_PROJECT_ID", "tgs-talk-to-data")
+    project_id = os.getenv("GCP_PROJECT_ID", "talk-to-my-data-508110")
 
     # 1. Store queries
     if "store" in q:

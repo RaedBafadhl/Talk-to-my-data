@@ -8,6 +8,7 @@ __pycache__/
 .env.local
 service-account.json
 credentials.json
+gha-creds-*.json
 .pytest_cache/
 tests/
 logs/
